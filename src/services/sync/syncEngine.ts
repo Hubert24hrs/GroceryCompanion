@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import * as db from '../database/sqlite';
 import { ShoppingList, ListItem } from '../../types';
+import { toSnakeCase } from '../../utils/formatters';
 
 const SYNC_BATCH_SIZE = 50;
 const MAX_RETRIES = 5;
@@ -80,12 +81,15 @@ export class SyncEngine {
     /**
      * Remove local-only fields before sending to server
      */
-    private cleanPayloadForRemote(data: any): any {
+    public cleanPayloadForRemote(data: any): any {
+        // First convert to snake_case to normalize keys
+        const snakeData = toSnakeCase(data);
+
         const {
-            isSynced,
-            syncVersion,
+            is_synced,
+            // sync_version is kept as it exists on server
             ...rest
-        } = data;
+        } = snakeData;
         return rest;
     }
 

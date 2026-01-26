@@ -16,7 +16,6 @@ import { useListStore, useLists, useIsLoading } from '../store/useListStore';
 import { useUserStore } from '../store/useUserStore';
 import { ListCard } from '../components/list/ListCard';
 import { Button } from '../components/common/Button';
-import { initDatabase } from '../services/database/sqlite';
 import { ShoppingList } from '../types';
 
 interface HomeScreenProps {
@@ -24,7 +23,6 @@ interface HomeScreenProps {
 }
 
 export function HomeScreen({ navigation }: HomeScreenProps) {
-    const [isDbReady, setIsDbReady] = useState(false);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [newListName, setNewListName] = useState('');
     const [selectedColor, setSelectedColor] = useState(LIST_COLORS[0]);
@@ -34,21 +32,17 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
     const { loadLists, createList, loadRecentItems } = useListStore();
     const { user } = useUserStore();
 
-    // Initialize database and load data
+    // Load data on mount
     useEffect(() => {
-        async function init() {
+        async function loadData() {
             try {
-                await initDatabase();
-                setIsDbReady(true);
                 await loadLists();
                 await loadRecentItems();
             } catch (error) {
-                console.error('Failed to initialize database:', error);
+                console.error('Failed to load data:', error);
             }
         }
-        init();
-
-
+        loadData();
     }, []);
 
     const handleCreatePress = () => {
@@ -74,15 +68,6 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
     const handleListPress = useCallback((list: ShoppingList) => {
         navigation.navigate('ListDetail', { listId: list.id });
     }, [navigation]);
-
-    if (!isDbReady) {
-        return (
-            <SafeAreaView style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={COLORS.primary} />
-                <Text style={styles.loadingText}>Loading...</Text>
-            </SafeAreaView>
-        );
-    }
 
     return (
         <SafeAreaView style={styles.container}>

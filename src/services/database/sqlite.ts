@@ -8,6 +8,8 @@ let db: SQLite.SQLiteDatabase | null = null;
  * Initialize the SQLite database and create tables
  */
 export async function initDatabase(): Promise<void> {
+    if (db) return;
+
     db = await SQLite.openDatabaseAsync('grocery_companion.db');
 
     await db.execAsync(`
