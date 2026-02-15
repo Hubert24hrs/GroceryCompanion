@@ -10,11 +10,13 @@ import {
     SafeAreaView,
     StatusBar,
     ActivityIndicator,
+    Alert,
 } from 'react-native';
 import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS, LIST_COLORS } from '../utils/constants';
 import { useListStore, useLists, useIsLoading } from '../store/useListStore';
 import { useUserStore } from '../store/useUserStore';
 import { ListCard } from '../components/list/ListCard';
+import { AdBanner } from '../components/monetization/AdBanner';
 import { Button } from '../components/common/Button';
 import { initDatabase } from '../services/database/sqlite';
 import { ShoppingList } from '../types';
@@ -26,12 +28,14 @@ interface HomeScreenProps {
 export function HomeScreen({ navigation }: HomeScreenProps) {
     const [isDbReady, setIsDbReady] = useState(false);
     const [showCreateModal, setShowCreateModal] = useState(false);
+    const [editingList, setEditingList] = useState<ShoppingList | null>(null);
     const [newListName, setNewListName] = useState('');
+    const [newListBudget, setNewListBudget] = useState('');
     const [selectedColor, setSelectedColor] = useState(LIST_COLORS[0]);
 
     const lists = useLists();
     const isLoading = useIsLoading();
-    const { loadLists, createList, loadRecentItems } = useListStore();
+    const { loadLists, createList, updateList, deleteList, loadRecentItems } = useListStore();
     const { user } = useUserStore();
 
     // Initialize database and load data
@@ -56,20 +60,65 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
             navigation.navigate('Paywall');
             return;
         }
+        setEditingList(null);
+        setNewListName('');
+        setNewListBudget('');
+        setSelectedColor(LIST_COLORS[0]);
         setShowCreateModal(true);
     };
 
-    const handleCreateList = useCallback(async () => {
+    const handleEditList = (list: ShoppingList) => {
+        setEditingList(list);
+        setNewListName(list.name);
+        setNewListBudget(list.budget ? list.budget.toString() : '');
+        setSelectedColor(list.color);
+        setShowCreateModal(true);
+    };
+
+    const handleSaveList = useCallback(async () => {
         if (!newListName.trim()) return;
 
-        const newList = await createList(newListName.trim(), selectedColor);
-        setShowCreateModal(false);
-        setNewListName('');
-        setSelectedColor(LIST_COLORS[0]);
+        const budget = newListBudget.trim() ? parseFloat(newListBudget) : undefined;
 
-        // Navigate to the new list
-        navigation.navigate('ListDetail', { listId: newList.id });
-    }, [newListName, selectedColor, createList, navigation]);
+        if (editingList) {
+            await updateList(editingList.id, {
+                name: newListName.trim(),
+                color: selectedColor,
+                budget
+            });
+            setShowCreateModal(false);
+        } else {
+            const newList = await createList(newListName.trim(), selectedColor, budget);
+            setShowCreateModal(false);
+            // Navigate to the new list
+            navigation.navigate('ListDetail', { listId: newList.id });
+        }
+
+        setNewListName('');
+        setNewListBudget('');
+        setSelectedColor(LIST_COLORS[0]);
+        setEditingList(null);
+    }, [newListName, newListBudget, selectedColor, editingList, createList, updateList, navigation]);
+
+    const handleDeleteList = async () => {
+        if (!editingList) return;
+
+        Alert.alert(
+            'Delete List',
+            `Are you sure you want to delete "${editingList.name}"?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        await deleteList(editingList.id);
+                        setShowCreateModal(false);
+                    }
+                }
+            ]
+        );
+    };
 
     const handleListPress = useCallback((list: ShoppingList) => {
         navigation.navigate('ListDetail', { listId: list.id });
@@ -133,6 +182,7 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
                         <ListCard
                             list={item}
                             onPress={() => handleListPress(item)}
+                            onLongPress={() => handleEditList(item)}
                         />
                     )}
                     refreshing={isLoading}
@@ -160,7 +210,7 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
             >
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>New List</Text>
+                        <Text style={styles.modalTitle}>{editingList ? 'Edit List' : 'New List'}</Text>
 
                         <TextInput
                             style={styles.modalInput}
@@ -169,6 +219,15 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
                             value={newListName}
                             onChangeText={setNewListName}
                             autoFocus
+                        />
+
+                        <TextInput
+                            style={styles.modalInput}
+                            placeholder="Budget (optional)"
+                            placeholderTextColor={COLORS.textLight}
+                            value={newListBudget}
+                            onChangeText={setNewListBudget}
+                            keyboardType="numeric"
                         />
 
                         <Text style={styles.colorLabel}>Pick a color</Text>
@@ -187,6 +246,15 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
                         </View>
 
                         <View style={styles.modalButtons}>
+                            {editingList && (
+                                <Button
+                                    title="Delete"
+                                    variant="outline"
+                                    onPress={handleDeleteList}
+                                    style={{ flex: 1, borderColor: COLORS.destructive }}
+                                    textStyle={{ color: COLORS.destructive }}
+                                />
+                            )}
                             <Button
                                 title="Cancel"
                                 variant="ghost"
@@ -194,8 +262,8 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
                                 style={{ flex: 1 }}
                             />
                             <Button
-                                title="Create"
-                                onPress={handleCreateList}
+                                title={editingList ? 'Save' : 'Create'}
+                                onPress={handleSaveList}
                                 disabled={!newListName.trim()}
                                 style={{ flex: 1 }}
                             />
@@ -203,6 +271,7 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
                     </View>
                 </View>
             </Modal>
+            <AdBanner />
         </SafeAreaView>
     );
 }

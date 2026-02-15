@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { HomeScreen } from '../screens/HomeScreen';
+import { TabNavigator } from './TabNavigator';
 import { ListDetailScreen } from '../screens/ListDetailScreen';
 import { NearbyStoresScreen } from '../screens/NearbyStoresScreen';
 import { AuthScreen } from '../screens/AuthScreen';
@@ -11,16 +11,8 @@ import { useSync } from '../hooks/useSync';
 import { ShareListScreen } from '../screens/ShareListScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { PaywallScreen } from '../screens/PaywallScreen';
-
-export type RootStackParamList = {
-    Auth: undefined;
-    Home: undefined;
-    ListDetail: { listId: string };
-    Settings: undefined;
-    NearbyStores: { listId: string };
-    ShareList: { listId: string };
-    Paywall: undefined;
-};
+import { RecipeDetailScreen } from '../screens/RecipeDetailScreen';
+import { RootStackParamList } from '../types/navigation';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -60,11 +52,9 @@ export function AppNavigator() {
                 ) : (
                     <>
                         <Stack.Screen
-                            name="Home"
-                            component={HomeScreen}
-                            options={{
-                                headerShown: false,
-                            }}
+                            name="Main"
+                            component={TabNavigator}
+                            options={{ headerShown: false }}
                         />
                         <Stack.Screen
                             name="ListDetail"
@@ -92,6 +82,16 @@ export function AppNavigator() {
                             component={SettingsScreen}
                             options={{
                                 title: 'Settings',
+                            }}
+                        />
+                        <Stack.Screen
+                            name="RecipeDetail"
+                            component={RecipeDetailScreen}
+                            options={{
+                                title: 'Recipe Details',
+                                headerTransparent: true,
+                                headerTintColor: COLORS.surface,
+                                headerTitleStyle: { color: 'transparent' }, // Hide title initially
                             }}
                         />
                         <Stack.Screen

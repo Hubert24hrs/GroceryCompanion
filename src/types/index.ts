@@ -7,6 +7,7 @@ export type Category =
   | 'bakery'
   | 'frozen'
   | 'pantry'
+  | 'beverages'
   | 'household'
   | 'personal_care'
   | 'other';
@@ -26,6 +27,7 @@ export interface ShoppingList {
   storeId?: string;
   storeName?: string;
   color: string;
+  budget?: number;
   isArchived: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -40,6 +42,7 @@ export interface ListItem {
   category: Category;
   quantity?: number;
   unit?: string;
+  price?: number;
   notes?: string;
   isChecked: boolean;
   isInPantry: boolean;
@@ -94,7 +97,40 @@ export const CATEGORY_CONFIG: Record<Category, { label: string; icon: string; co
   bakery: { label: 'Bakery', icon: '🍞', color: '#FF9800' },
   frozen: { label: 'Frozen', icon: '🧊', color: '#00BCD4' },
   pantry: { label: 'Pantry', icon: '🥫', color: '#795548' },
+  beverages: { label: 'Beverages', icon: '🥤', color: '#607D8B' },
   household: { label: 'Household', icon: '🧹', color: '#9C27B0' },
   personal_care: { label: 'Personal Care', icon: '🧴', color: '#E91E63' },
   other: { label: 'Other', icon: '📦', color: '#607D8B' },
+
 };
+
+export interface Ingredient {
+  name: string;
+  amount: number;
+  unit: string;
+  category: Category;
+}
+
+export interface Recipe {
+  id: string;
+  title: string;
+  description: string;
+  image: any; // URL or require source
+  prepTime: number; // minutes
+  cookTime: number; // minutes
+  servings: number;
+  calories?: number;
+  ingredients: Ingredient[];
+  instructions: string[];
+  tags: string[];
+  isFavorite: boolean;
+}
+
+export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
+
+export interface MealPlanEntry {
+  id: string;
+  date: string; // ISO date string (YYYY-MM-DD)
+  type: MealType;
+  recipeId: string;
+}

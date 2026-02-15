@@ -69,10 +69,21 @@ export async function initDatabase(): Promise<void> {
     );
     
     -- Create indexes for faster queries
-    CREATE INDEX IF NOT EXISTS idx_items_list_id ON items(list_id);
-    CREATE INDEX IF NOT EXISTS idx_items_category ON items(category);
     CREATE INDEX IF NOT EXISTS idx_recent_items_usage ON recent_items(usage_count DESC);
   `);
+
+    // Migrations for new columns
+    try {
+        await db.execAsync('ALTER TABLE lists ADD COLUMN budget REAL;');
+    } catch (e) {
+        // Column likely exists
+    }
+
+    try {
+        await db.execAsync('ALTER TABLE items ADD COLUMN price REAL;');
+    } catch (e) {
+        // Column likely exists
+    }
 }
 
 /**
@@ -87,18 +98,18 @@ export function getDatabase(): SQLite.SQLiteDatabase {
 
 // ==================== Lists CRUD ====================
 
-export async function createList(name: string, color: string = '#4CAF50'): Promise<ShoppingList> {
+export async function createList(name: string, color: string = '#4CAF50', budget?: number): Promise<ShoppingList> {
     const database = getDatabase();
     const now = new Date().toISOString();
     const id = uuidv4();
 
     await database.runAsync(
-        `INSERT INTO lists (id, name, color, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
-        [id, name, color, now, now]
+        `INSERT INTO lists (id, name, color, budget, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
+        [id, name, color, budget ?? null, now, now]
     );
 
     await addToSyncQueue('CREATE', 'lists', id, {
-        id, name, color, created_at: now, updated_at: now,
+        id, name, color, budget, created_at: now, updated_at: now,
         owner_id: '', is_archived: 0, sync_version: 0, is_synced: 0
     });
 
@@ -128,6 +139,7 @@ export async function getAllLists(): Promise<ShoppingList[]> {
         storeId: row.store_id,
         storeName: row.store_name,
         color: row.color,
+        budget: row.budget,
         isArchived: Boolean(row.is_archived),
         createdAt: new Date(row.created_at),
         updatedAt: new Date(row.updated_at),
@@ -152,6 +164,7 @@ export async function getListById(id: string): Promise<ShoppingList | null> {
         storeId: row.store_id,
         storeName: row.store_name,
         color: row.color,
+        budget: row.budget,
         isArchived: Boolean(row.is_archived),
         createdAt: new Date(row.created_at),
         updatedAt: new Date(row.updated_at),
@@ -187,6 +200,10 @@ export async function updateList(id: string, updates: Partial<ShoppingList>): Pr
         setClauses.push('is_archived = ?');
         values.push(updates.isArchived ? 1 : 0);
     }
+    if (updates.budget !== undefined) {
+        setClauses.push('budget = ?');
+        values.push(updates.budget);
+    }
 
     values.push(id);
 
@@ -212,6 +229,7 @@ export async function createItem(
     category: Category,
     quantity?: number,
     unit?: string,
+    price?: number,
     notes?: string
 ): Promise<ListItem> {
     const database = getDatabase();
@@ -219,16 +237,16 @@ export async function createItem(
     const id = uuidv4();
 
     await database.runAsync(
-        `INSERT INTO items (id, list_id, name, category, quantity, unit, notes, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [id, listId, name, category, quantity ?? null, unit ?? null, notes ?? null, now, now]
+        `INSERT INTO items (id, list_id, name, category, quantity, unit, price, notes, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id, listId, name, category, quantity ?? null, unit ?? null, price ?? null, notes ?? null, now, now]
     );
 
     // Update recent items for autocomplete
     await updateRecentItem(name, category);
 
     await addToSyncQueue('CREATE', 'items', id, {
-        id, list_id: listId, name, category, quantity, unit, notes,
+        id, list_id: listId, name, category, quantity, unit, price, notes,
         is_checked: 0, is_in_pantry: 0, created_at: now, updated_at: now,
         sync_version: 0, is_synced: 0
     });
@@ -264,6 +282,45 @@ export async function getItemsByListId(listId: string): Promise<ListItem[]> {
         category: row.category as Category,
         quantity: row.quantity,
         unit: row.unit,
+        price: row.price,
+        notes: row.notes,
+        isChecked: Boolean(row.is_checked),
+        isInPantry: Boolean(row.is_in_pantry),
+        addedBy: row.added_by,
+        checkedBy: row.checked_by,
+        createdAt: new Date(row.created_at),
+        updatedAt: new Date(row.updated_at),
+        syncVersion: row.sync_version,
+        isSynced: Boolean(row.is_synced),
+    }));
+}
+
+export async function getExpenses(startDate?: Date, endDate?: Date): Promise<ListItem[]> {
+    const database = getDatabase();
+    let query = `SELECT * FROM items WHERE is_in_pantry = 1 AND price IS NOT NULL`;
+    const params: any[] = [];
+
+    if (startDate) {
+        query += ` AND updated_at >= ?`;
+        params.push(startDate.toISOString());
+    }
+    if (endDate) {
+        query += ` AND updated_at <= ?`;
+        params.push(endDate.toISOString());
+    }
+
+    query += ` ORDER BY updated_at DESC`;
+
+    const rows = await database.getAllAsync<any>(query, params);
+
+    return rows.map(row => ({
+        id: row.id,
+        listId: row.list_id,
+        name: row.name,
+        category: row.category as Category,
+        quantity: row.quantity,
+        unit: row.unit,
+        price: row.price,
         notes: row.notes,
         isChecked: Boolean(row.is_checked),
         isInPantry: Boolean(row.is_in_pantry),
@@ -298,6 +355,10 @@ export async function updateItem(id: string, updates: Partial<ListItem>): Promis
     if (updates.unit !== undefined) {
         setClauses.push('unit = ?');
         values.push(updates.unit);
+    }
+    if (updates.price !== undefined) {
+        setClauses.push('price = ?');
+        values.push(updates.price);
     }
     if (updates.notes !== undefined) {
         setClauses.push('notes = ?');

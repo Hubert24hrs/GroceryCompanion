@@ -3,7 +3,11 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'rea
 import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../../utils/constants';
 import { usePantryItemsByCategory, useListStore } from '../../store/useListStore';
 
-export function PantryList() {
+interface PantryListProps {
+    onEditItem?: (item: any) => void;
+}
+
+export function PantryList({ onEditItem }: PantryListProps) {
     const itemsByCategory = usePantryItemsByCategory();
     const { moveToList, deleteItem } = useListStore();
 
@@ -42,12 +46,18 @@ export function PantryList() {
                                 key={item.id}
                                 style={styles.itemRow}
                                 onPress={() => handleItemPress(item)}
+                                onLongPress={() => onEditItem?.(item)}
                             >
                                 <View style={styles.itemInfo}>
                                     <Text style={styles.itemName}>{item.name}</Text>
                                     {item.quantity && (
                                         <Text style={styles.itemQuantity}>
                                             {item.quantity} {item.unit}
+                                        </Text>
+                                    )}
+                                    {item.price && (
+                                        <Text style={styles.itemQuantity}>
+                                            ${item.price.toFixed(2)}
                                         </Text>
                                     )}
                                 </View>

@@ -16,6 +16,7 @@ export const COLORS = {
     success: '#4CAF50',
     warning: '#FF9800',
     checked: '#9E9E9E',
+    destructive: '#FF3B30',
 };
 
 export const SPACING = {

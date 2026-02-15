@@ -47,10 +47,12 @@ export function ItemRow({ item, onPress, onLongPress }: ItemRowProps) {
                     {item.name}
                 </Text>
 
-                {(item.quantity || item.notes) && (
+                {(item.quantity || item.price || item.notes) && (
                     <Text style={styles.details} numberOfLines={1}>
-                        {item.quantity && `${item.quantity}${item.unit ? ` ${item.unit}` : ''}`}
-                        {item.quantity && item.notes && ' · '}
+                        {item.quantity ? `${item.quantity}${item.unit ? ` ${item.unit}` : ''}` : ''}
+                        {item.quantity && (item.price || item.notes) ? ' · ' : ''}
+                        {item.price ? `$${item.price.toFixed(2)}` : ''}
+                        {item.price && item.notes ? ' · ' : ''}
                         {item.notes}
                     </Text>
                 )}

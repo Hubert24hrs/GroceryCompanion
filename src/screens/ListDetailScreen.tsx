@@ -8,15 +8,23 @@ import {
     SafeAreaView,
     StatusBar,
     Alert,
+    Modal,
 } from 'react-native';
 import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../utils/constants';
-import { CATEGORY_CONFIG, Category, ListItem } from '../types';
+import { CATEGORY_CONFIG, ListItem } from '../types';
 import { useListStore, useCurrentList, useItemsByCategory, useUncheckedCount, useCheckedCount } from '../store/useListStore';
 import { QuickAddBar } from '../components/entry/QuickAddBar';
 import { CategorySection } from '../components/list/ItemRow';
 import { PantryList } from '../components/list/PantryList';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import * as Haptics from 'expo-haptics';
+import { BarcodeScanner } from '../components/scanner/BarcodeScanner';
+import { Ionicons } from '@expo/vector-icons';
+
+import { EditItemModal } from '../components/list/EditItemModal';
+import { AdBanner } from '../components/monetization/AdBanner';
+import { SmartAddModal } from '../components/entry/SmartAddModal';
+import { parseIngredient } from '../utils/parsing';
 
 interface ListDetailScreenProps {
     navigation: any;
@@ -26,6 +34,9 @@ interface ListDetailScreenProps {
 export function ListDetailScreen({ navigation, route }: ListDetailScreenProps) {
     const { listId } = route.params;
     const [viewMode, setViewMode] = useState<'shopping' | 'pantry'>('shopping');
+    const [showScanner, setShowScanner] = useState(false);
+    const [showSmartAdd, setShowSmartAdd] = useState(false);
+    const [editingItem, setEditingItem] = useState<ListItem | null>(null);
     const confettiRef = useRef<any>(null);
 
     const currentList = useCurrentList();
@@ -33,13 +44,13 @@ export function ListDetailScreen({ navigation, route }: ListDetailScreenProps) {
     const uncheckedCount = useUncheckedCount();
     const checkedCount = useCheckedCount();
 
-    const { selectList, clearCheckedItems, deleteItem, checkout } = useListStore();
+    const { selectList, deleteItem, checkout, addItem, updateItem } = useListStore();
 
     useEffect(() => {
         selectList(listId);
     }, [listId]);
 
-    // Update navigation title
+    // Update navigation title and header buttons
     useEffect(() => {
         if (currentList) {
             navigation.setOptions({
@@ -49,22 +60,48 @@ export function ListDetailScreen({ navigation, route }: ListDetailScreenProps) {
                 },
                 headerTintColor: COLORS.surface,
                 headerRight: () => (
-                    <View style={{ flexDirection: 'row', gap: 16 }}>
+                    <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center', marginRight: 8 }}>
+                        <TouchableOpacity
+                            onPress={() => setShowScanner(true)}
+                            style={{ padding: 4 }}
+                        >
+                            <Ionicons name="barcode-outline" size={24} color={COLORS.surface} />
+                        </TouchableOpacity>
                         <TouchableOpacity
                             onPress={() => navigation.navigate('NearbyStores', { listId })}
+                            style={{ padding: 4 }}
                         >
-                            <Text style={{ fontSize: 24 }}>📍</Text>
+                            <Ionicons name="location-outline" size={24} color={COLORS.surface} />
                         </TouchableOpacity>
                         <TouchableOpacity
                             onPress={() => navigation.navigate('ShareList', { listId })}
+                            style={{ padding: 4 }}
                         >
-                            <Text style={{ fontSize: 24 }}>📤</Text>
+                            <Ionicons name="share-outline" size={24} color={COLORS.surface} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={() => setShowSmartAdd(true)}
+                            style={{ padding: 4 }}
+                        >
+                            <Ionicons name="clipboard-outline" size={24} color={COLORS.surface} />
                         </TouchableOpacity>
                     </View>
                 ),
             });
         }
-    }, [currentList, navigation]);
+    }, [currentList, navigation, listId]);
+
+    const handleScan = (data: string) => {
+        setShowScanner(false);
+        // In a real app, we would fetch product details from an API using the barcode
+        // For now, we just add a placeholder item using the barcode as the name
+        // We'll set the category to 'other' by default
+        addItem(`Item ${data}`, 'other');
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+        // Optional: Show a toast or small alert
+        Alert.alert('Item Added', `Added item with barcode: ${data}`);
+    };
 
     useEffect(() => {
         if (uncheckedCount === 0 && checkedCount > 0 && viewMode === 'shopping') {
@@ -80,7 +117,7 @@ export function ListDetailScreen({ navigation, route }: ListDetailScreenProps) {
 
         Alert.alert(
             'Checkout Items?',
-            `Move ${checkedCount} checked item${checkedCount > 1 ? 's' : ''} to your Pantry?`,
+            `Move ${checkedCount} checked item${checkedCount !== 1 ? 's' : ''} to your Pantry?`,
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
@@ -98,18 +135,47 @@ export function ListDetailScreen({ navigation, route }: ListDetailScreenProps) {
 
     const handleItemLongPress = useCallback((item: ListItem) => {
         Alert.alert(
-            item.name,
-            'What would you like to do?',
+            'Item Options',
+            `What would you like to do with "${item.name}"?`,
             [
                 { text: 'Cancel', style: 'cancel' },
+                { text: 'Edit Item', onPress: () => setEditingItem(item) },
                 {
                     text: 'Delete',
                     style: 'destructive',
-                    onPress: () => deleteItem(item.id),
-                },
+                    onPress: () => deleteItem(item.id)
+                }
             ]
         );
     }, [deleteItem]);
+
+    const handleSaveItemUpdates = useCallback(async (updates: Partial<ListItem>) => {
+        if (editingItem) {
+            await updateItem(editingItem.id, updates);
+            setEditingItem(null);
+        }
+    }, [editingItem, updateItem]);
+
+    const handleSmartAdd = useCallback(async (items: string[]) => {
+        let addedCount = 0;
+        for (const itemText of items) {
+            const parsed = parseIngredient(itemText);
+            if (parsed.name) {
+                await addItem(
+                    parsed.name,
+                    undefined, // Auto-categorize
+                    parsed.quantity,
+                    parsed.unit
+                );
+                addedCount++;
+            }
+        }
+
+        if (addedCount > 0) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            // confettiRef.current?.start(); // Optional celebration
+        }
+    }, [addItem]);
 
     // Get categories that have items
     const categoriesWithItems = Object.entries(itemsByCategory)
@@ -119,15 +185,25 @@ export function ListDetailScreen({ navigation, route }: ListDetailScreenProps) {
             return order.indexOf(a[0]) - order.indexOf(b[0]);
         });
 
-    // Split into unchecked and checked
-    const uncheckedCategories = categoriesWithItems.filter(([_, items]) =>
-        items.some(item => !item.isChecked)
-    );
+    // Split into unchecked and checked (logic is handled by viewMode really, but this was in previous code)
+    // Actually, itemsByCategory returns all items. We filter in render if needed, but the list shows all.
+    // The previous code had specific logic for "complete state" which assumes unchecked items present?
+    // Let's keep existing logic.
 
-    const hasOnlyCheckedItems = uncheckedCategories.length === 0 && checkedCount > 0;
+    // Check if we have ONLY checked items to show "Shopping complete"
+    // We need to know if there are unchecked items.
+    const hasUncheckedItems = uncheckedCount > 0;
+    const hasOnlyCheckedItems = !hasUncheckedItems && checkedCount > 0;
 
     return (
         <SafeAreaView style={styles.container}>
+            <Modal visible={showScanner} animationType="slide" onRequestClose={() => setShowScanner(false)}>
+                <BarcodeScanner
+                    onScan={handleScan}
+                    onClose={() => setShowScanner(false)}
+                />
+            </Modal>
+
             <StatusBar barStyle="light-content" backgroundColor={currentList?.color || COLORS.primary} />
 
             {/* View Toggle */}
@@ -147,11 +223,9 @@ export function ListDetailScreen({ navigation, route }: ListDetailScreenProps) {
             </View>
 
             {viewMode === 'pantry' ? (
-                <PantryList />
+                <PantryList onEditItem={setEditingItem} />
             ) : (
                 <>
-                    {/* Progress header */}
-
                     {/* Progress header */}
                     <View style={styles.progressHeader}>
                         <View style={styles.progressInfo}>
@@ -214,6 +288,20 @@ export function ListDetailScreen({ navigation, route }: ListDetailScreenProps) {
                     />
                 </>
             )}
+
+            <EditItemModal
+                visible={!!editingItem}
+                item={editingItem}
+                onClose={() => setEditingItem(null)}
+                onSave={handleSaveItemUpdates}
+            />
+
+            <SmartAddModal
+                visible={showSmartAdd}
+                onClose={() => setShowSmartAdd(false)}
+                onAddItems={handleSmartAdd}
+            />
+            <AdBanner />
         </SafeAreaView>
     );
 }

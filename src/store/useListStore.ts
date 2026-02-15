@@ -13,14 +13,14 @@ interface ListStore {
 
     // List actions
     loadLists: () => Promise<void>;
-    createList: (name: string, color?: string) => Promise<ShoppingList>;
+    createList: (name: string, color?: string, budget?: number) => Promise<ShoppingList>;
     selectList: (listId: string) => Promise<void>;
     updateList: (listId: string, updates: Partial<ShoppingList>) => Promise<void>;
     deleteList: (listId: string) => Promise<void>;
 
     // Item actions
     loadItems: (listId: string) => Promise<void>;
-    addItem: (name: string, category?: Category, quantity?: number, unit?: string, notes?: string) => Promise<ListItem | null>;
+    addItem: (name: string, category?: Category, quantity?: number, unit?: string, price?: number, notes?: string) => Promise<ListItem | null>;
     toggleItem: (itemId: string) => Promise<void>;
     updateItem: (itemId: string, updates: Partial<ListItem>) => Promise<void>;
     deleteItem: (itemId: string) => Promise<void>;
@@ -56,10 +56,10 @@ export const useListStore = create<ListStore>((set, get) => ({
         }
     },
 
-    createList: async (name: string, color?: string) => {
+    createList: async (name: string, color?: string, budget?: number) => {
         set({ isLoading: true, error: null });
         try {
-            const newList = await db.createList(name, color);
+            const newList = await db.createList(name, color, budget);
             set(state => ({
                 lists: [newList, ...state.lists],
                 isLoading: false,
@@ -127,7 +127,7 @@ export const useListStore = create<ListStore>((set, get) => ({
         }
     },
 
-    addItem: async (name: string, category?: Category, quantity?: number, unit?: string, notes?: string) => {
+    addItem: async (name: string, category?: Category, quantity?: number, unit?: string, price?: number, notes?: string) => {
         const { currentList } = get();
         if (!currentList) {
             set({ error: 'No list selected' });
@@ -137,7 +137,7 @@ export const useListStore = create<ListStore>((set, get) => ({
         try {
             // Auto-categorize if no category provided
             const finalCategory = category || autoCategorize(name);
-            const newItem = await db.createItem(currentList.id, name, finalCategory, quantity, unit, notes);
+            const newItem = await db.createItem(currentList.id, name, finalCategory, quantity, unit, price, notes);
 
             set(state => ({
                 items: [...state.items, newItem],

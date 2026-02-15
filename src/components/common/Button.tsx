@@ -17,6 +17,7 @@ interface ButtonProps extends TouchableOpacityProps {
     loading?: boolean;
     icon?: React.ReactNode;
     fullWidth?: boolean;
+    textStyle?: TextStyle;
 }
 
 const variantButtonStyles = {
@@ -63,14 +64,15 @@ export function Button({
         fullWidth ? styles.fullWidth : {},
         disabled ? styles.disabled : {},
         style as ViewStyle,
-    ].filter(Boolean);
+    ].filter(Boolean) as ViewStyle[];
 
     const textStyles: TextStyle[] = [
         styles.text,
         variantTextStyles[variant] as TextStyle,
         sizeTextStyles[size] as TextStyle,
         disabled ? styles.disabledText : {},
-    ].filter(Boolean);
+        props.textStyle,
+    ].filter(Boolean) as TextStyle[];
 
     return (
         <TouchableOpacity

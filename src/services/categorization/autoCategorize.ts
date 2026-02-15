@@ -59,10 +59,14 @@ const CATEGORY_KEYWORDS: Record<Category, string[]> = {
         'peanut butter', 'almond butter', 'jelly', 'jam', 'honey', 'maple syrup', 'nutella',
         'ketchup', 'mustard', 'mayonnaise', 'ranch', 'dressing', 'bbq sauce', 'soy sauce', 'hot sauce',
         'vinegar', 'balsamic', 'apple cider vinegar', 'wine vinegar',
-        'coffee', 'tea', 'juice', 'soda', 'water', 'sparkling water', 'energy drink',
         'chips', 'crackers', 'pretzels', 'popcorn', 'nuts', 'almonds', 'peanuts', 'cashews',
         'chocolate', 'candy', 'snacks', 'protein bar', 'dried fruit', 'raisins',
         'canned tuna', 'canned chicken', 'spam', 'sardines', 'anchovies'
+    ],
+    beverages: [
+        'coffee', 'tea', 'juice', 'soda', 'water', 'sparkling water', 'energy drink',
+        'beer', 'wine', 'liquor', 'alcohol', 'vodka', 'whiskey', 'gin', 'rum', 'tequila',
+        'coke', 'pepsi', 'sprite', 'dr pepper', 'mountain dew', 'gatorade', 'powerade'
     ],
     household: [
         'paper towel', 'paper towels', 'toilet paper', 'tissue', 'tissues', 'napkins',
@@ -74,7 +78,8 @@ const CATEGORY_KEYWORDS: Record<Category, string[]> = {
         'sponge', 'sponges', 'scrub brush', 'steel wool', 'dish brush',
         'mop', 'broom', 'dustpan', 'vacuum bags', 'duster',
         'light bulb', 'batteries', 'matches', 'candles', 'air freshener',
-        'pet food', 'dog food', 'cat food', 'cat litter', 'pet treats'
+        'pet food', 'dog food', 'cat food', 'cat litter', 'pet treats',
+        'foil', 'plastic wrap', 'sandwich bags', 'freezer bags'
     ],
     personal_care: [
         'shampoo', 'conditioner', 'body wash', 'soap', 'bar soap', 'hand soap',

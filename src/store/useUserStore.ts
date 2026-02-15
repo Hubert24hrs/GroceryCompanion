@@ -12,6 +12,7 @@ interface UserStore {
     initialize: () => Promise<void>;
     signInAnonymously: () => Promise<void>;
     signOut: () => Promise<void>;
+    setProStatus: (status: boolean) => void;
 }
 
 export const useUserStore = create<UserStore>((set) => ({
@@ -76,4 +77,11 @@ export const useUserStore = create<UserStore>((set) => ({
             set({ error: (error as Error).message, isLoading: false });
         }
     },
+
+    // Manual override for testing/mocking Pro status
+    setProStatus: (status: boolean) => {
+        set((state) => ({
+            user: state.user ? { ...state.user, isPro: status } : null
+        }));
+    }
 }));

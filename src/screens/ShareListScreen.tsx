@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Share, Alert, ScrollView } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../navigation/AppNavigator';
+import { RootStackParamList } from '../types/navigation';
 import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../utils/constants';
 import { Button } from '../components/common/Button';
 import { useListStore } from '../store/useListStore';

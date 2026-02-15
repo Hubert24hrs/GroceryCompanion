@@ -1,118 +1,97 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../utils/constants';
+import { PremiumFeatureRow } from '../components/monetization/PremiumFeatureRow';
 import { useUserStore } from '../store/useUserStore';
-import { supabase } from '../services/sync/supabase';
 
-export function PaywallScreen({ navigation }: any) {
-    const { user } = useUserStore();
+interface PaywallScreenProps {
+    navigation: any;
+    route?: any;
+}
+
+export function PaywallScreen({ navigation }: PaywallScreenProps) {
+    const { setProStatus } = useUserStore();
     const [isLoading, setIsLoading] = useState(false);
 
-    const handlePurchase = async () => {
-        if (!user) return;
+    const handleSubscribe = async () => {
         setIsLoading(true);
-
-        try {
-            // Simulate purchase delay
-            await new Promise(resolve => setTimeout(resolve, 2000));
-
-            // Upgrade user in DB (This is temporary for MVP - strictly RLS should prevent this)
-            // Ideally call a Cloud Function or verify receipt on backend
-            const { error } = await supabase.rpc('upgrade_to_pro');
-
-            if (error) {
-                // Fallback if RPC doesn't exist yet (user didn't run migration)
-                const { error: updateError } = await supabase
-                    .from('profiles')
-                    .update({ is_pro: true })
-                    .eq('id', user.id);
-
-                if (updateError) throw updateError;
-            }
-
-            Alert.alert('🎉 Success!', 'You are now a Pro member. Enjoy unlimited access!', [
-                { text: 'OK', onPress: () => navigation.goBack() }
-            ]);
-
-            // Trigger store refresh (handled by onAuthStateChange logic or force reload)
-            // For now, we rely on Realtime or next app start. 
-            // Better: update valid session.
-
-        } catch (error) {
-            Alert.alert('Purchase Failed', (error as Error).message);
-        } finally {
+        // Mock purchase delay
+        setTimeout(() => {
             setIsLoading(false);
-        }
+            setProStatus(true);
+            Alert.alert(
+                "Success!",
+                "You are now a Premium member. Enjoy the ad-free experience!",
+                [{ text: "Awesome", onPress: () => navigation.goBack() }]
+            );
+        }, 1500);
     };
 
-    const handleRestore = async () => {
+    const handleRestore = () => {
         setIsLoading(true);
         setTimeout(() => {
             setIsLoading(false);
-            Alert.alert('Restore', 'Purchases restored.');
+            setProStatus(true);
+            Alert.alert("Restored", "Your purchases have been restored.");
         }, 1500);
     };
 
     return (
         <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.closeButton}>
-                    <Text style={styles.closeText}>✕</Text>
-                </TouchableOpacity>
-            </View>
-
-            <ScrollView contentContainerStyle={styles.content}>
-                <View style={styles.iconContainer}>
-                    <Text style={styles.icon}>👑</Text>
+            <ScrollView contentContainerStyle={styles.scrollContent}>
+                <View style={styles.header}>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.closeButton}>
+                        <Ionicons name="close" size={28} color={COLORS.textSecondary} />
+                    </TouchableOpacity>
                 </View>
 
-                <Text style={styles.title}>Unlock Grocery Pro</Text>
-                <Text style={styles.subtitle}>
-                    Get the ultimate shopping experience without limits.
-                </Text>
+                <View style={styles.hero}>
+                    <Image
+                        source={{ uri: 'https://images.unsplash.com/photo-1556742049-0cfed4f7a07d?q=80&w=1974&auto=format&fit=crop' }}
+                        style={styles.heroImage}
+                    />
+                    <Text style={styles.title}>Unlock Premium</Text>
+                    <Text style={styles.subtitle}>Get the most out of Grocery Companion</Text>
+                </View>
 
                 <View style={styles.features}>
-                    <FeatureRow icon="📝" text="Unlimited Shopping Lists" />
-                    <FeatureRow icon="👥" text="Unlimited Collaborators" />
-                    <FeatureRow icon="☁️" text="Cloud Backup & Sync" />
-                    <FeatureRow icon="🎨" text="Custom Themes & Icons" />
-                    <FeatureRow icon="❤️" text="Support Indie Development" />
+                    <PremiumFeatureRow icon="ban" text="Remove All Ads" />
+                    <PremiumFeatureRow icon="stats-chart" text="Advanced Analytics (Coming Soon)" />
+                    <PremiumFeatureRow icon="people" text="Unlimited Shared Lists (Coming Soon)" />
+                    <PremiumFeatureRow icon="star" text="Exclusive Premium Recipes" />
                 </View>
 
                 <View style={styles.pricingContainer}>
-                    <Text style={styles.price}>$4.99</Text>
-                    <Text style={styles.period}>One-time purchase</Text>
+                    <View style={styles.priceCard}>
+                        <Text style={styles.period}>Monthly</Text>
+                        <Text style={styles.price}>$2.99</Text>
+                        <Text style={styles.perMonth}>/ month</Text>
+                    </View>
                 </View>
-            </ScrollView>
 
-            <View style={styles.footer}>
                 <TouchableOpacity
-                    style={styles.purchaseButton}
-                    onPress={handlePurchase}
+                    style={styles.subscribeButton}
+                    onPress={handleSubscribe}
                     disabled={isLoading}
                 >
                     {isLoading ? (
-                        <ActivityIndicator color="#FFF" />
+                        <ActivityIndicator color={COLORS.surface} />
                     ) : (
-                        <Text style={styles.purchaseButtonText}>Upgrade Now</Text>
+                        <Text style={styles.subscribeText}>Subscribe Now</Text>
                     )}
                 </TouchableOpacity>
 
-                <TouchableOpacity onPress={handleRestore} disabled={isLoading}>
+                <TouchableOpacity onPress={handleRestore} style={styles.restoreButton}>
                     <Text style={styles.restoreText}>Restore Purchases</Text>
                 </TouchableOpacity>
-            </View>
-        </SafeAreaView>
-    );
-}
 
-function FeatureRow({ icon, text }: { icon: string; text: string }) {
-    return (
-        <View style={styles.featureRow}>
-            <Text style={styles.featureIcon}>{icon}</Text>
-            <Text style={styles.featureText}>{text}</Text>
-        </View>
+                <Text style={styles.disclaimer}>
+                    Subscription automatically renews unless auto-renew is turned off at least 24-hours before the end of the current period.
+                </Text>
+            </ScrollView>
+        </SafeAreaView>
     );
 }
 
@@ -121,107 +100,110 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: COLORS.background,
     },
+    scrollContent: {
+        paddingBottom: SPACING.xl,
+    },
     header: {
-        padding: SPACING.lg,
+        padding: SPACING.md,
         alignItems: 'flex-end',
     },
     closeButton: {
         padding: SPACING.xs,
     },
-    closeText: {
-        fontSize: FONT_SIZES.xl,
-        color: COLORS.textSecondary,
-    },
-    content: {
-        padding: SPACING.xl,
+    hero: {
         alignItems: 'center',
-    },
-    iconContainer: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
-        backgroundColor: COLORS.primary + '20',
-        alignItems: 'center',
-        justifyContent: 'center',
         marginBottom: SPACING.xl,
+        paddingHorizontal: SPACING.lg,
     },
-    icon: {
-        fontSize: 48,
+    heroImage: {
+        width: 120,
+        height: 120,
+        borderRadius: 60,
+        marginBottom: SPACING.lg,
+        backgroundColor: COLORS.secondary,
     },
     title: {
         fontSize: FONT_SIZES.xxl,
         fontWeight: 'bold',
         color: COLORS.text,
+        marginBottom: SPACING.xs,
         textAlign: 'center',
-        marginBottom: SPACING.sm,
     },
     subtitle: {
         fontSize: FONT_SIZES.md,
         color: COLORS.textSecondary,
         textAlign: 'center',
-        marginBottom: SPACING.xxl,
-        paddingHorizontal: SPACING.lg,
     },
     features: {
-        width: '100%',
-        marginBottom: SPACING.xxl,
-        backgroundColor: COLORS.surface,
-        padding: SPACING.lg,
-        borderRadius: BORDER_RADIUS.xl,
-    },
-    featureRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: SPACING.md,
-    },
-    featureIcon: {
-        fontSize: FONT_SIZES.lg,
-        marginRight: SPACING.md,
-    },
-    featureText: {
-        fontSize: FONT_SIZES.md,
-        color: COLORS.text,
-        fontWeight: '500',
+        paddingHorizontal: SPACING.xl,
+        marginBottom: SPACING.xl,
     },
     pricingContainer: {
-        alignItems: 'center',
+        paddingHorizontal: SPACING.xl,
+        marginBottom: SPACING.xl,
     },
-    price: {
-        fontSize: 48,
-        fontWeight: 'bold',
-        color: COLORS.primary,
+    priceCard: {
+        backgroundColor: COLORS.surface,
+        borderRadius: BORDER_RADIUS.xl,
+        padding: SPACING.lg,
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: COLORS.primary,
+        shadowColor: COLORS.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 4,
     },
     period: {
         fontSize: FONT_SIZES.md,
         color: COLORS.textSecondary,
-        fontWeight: '500',
+        fontWeight: '600',
+        marginBottom: 4,
     },
-    footer: {
-        padding: SPACING.xl,
-        borderTopWidth: 1,
-        borderTopColor: COLORS.divider,
-        backgroundColor: COLORS.surface,
+    price: {
+        fontSize: 32,
+        fontWeight: 'bold',
+        color: COLORS.text,
+        marginBottom: 4,
     },
-    purchaseButton: {
+    perMonth: {
+        fontSize: FONT_SIZES.sm,
+        color: COLORS.textLight,
+    },
+    subscribeButton: {
         backgroundColor: COLORS.primary,
-        paddingVertical: SPACING.lg,
+        marginHorizontal: SPACING.xl,
+        paddingVertical: 16,
         borderRadius: BORDER_RADIUS.full,
         alignItems: 'center',
-        marginBottom: SPACING.lg,
+        marginBottom: SPACING.md,
         shadowColor: COLORS.primary,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
         elevation: 4,
     },
-    purchaseButtonText: {
-        color: '#FFFFFF',
+    subscribeText: {
+        color: COLORS.surface,
         fontSize: FONT_SIZES.lg,
         fontWeight: 'bold',
     },
+    restoreButton: {
+        alignItems: 'center',
+        marginBottom: SPACING.lg,
+        padding: SPACING.sm,
+    },
     restoreText: {
-        textAlign: 'center',
         color: COLORS.textSecondary,
         fontSize: FONT_SIZES.sm,
+        fontWeight: '600',
+    },
+    disclaimer: {
+        fontSize: 10,
+        color: COLORS.textLight,
+        textAlign: 'center',
+        paddingHorizontal: SPACING.xl,
+        lineHeight: 14,
     },
 });
