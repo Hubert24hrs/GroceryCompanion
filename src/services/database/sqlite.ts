@@ -1,13 +1,32 @@
+import { Platform } from 'react-native';
 import * as SQLite from 'expo-sqlite';
 import { ShoppingList, ListItem, RecentItem, SyncOperation, Category } from '../../types';
 import { v4 as uuidv4 } from 'uuid';
 
-let db: SQLite.SQLiteDatabase | null = null;
+let db: any | null = null;
+const isWeb = Platform.OS === 'web';
+
+// Simple mock for web environment
+const webDbMock = {
+    execAsync: async () => { },
+    runAsync: async () => ({ lastInsertRowId: 0, changes: 0 }),
+    getAllAsync: async () => [],
+    getFirstAsync: async () => null,
+    prepareAsync: async () => ({
+        executeAsync: async () => ({ getAllAsync: async () => [] }),
+        finalizeAsync: async () => { }
+    })
+};
 
 /**
  * Initialize the SQLite database and create tables
  */
 export async function initDatabase(): Promise<void> {
+    if (isWeb) {
+        console.warn('SQLite is not supported on web. Using in-memory fallback (mock).');
+        db = webDbMock;
+        return;
+    }
     db = await SQLite.openDatabaseAsync('grocery_companion.db');
 
     await db.execAsync(`
