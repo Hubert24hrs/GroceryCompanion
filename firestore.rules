@@ -1,0 +1,236 @@
+rules_version = '2';
+
+// GroceryCompanion security rules.
+//
+// Everything a household shares lives under /households/{hid}. Members are
+// /households/{hid}/members/{uid} with role owner | editor | viewer, and the
+// household doc keeps `memberIds` so joins and removals can be checked (and
+// the free-plan member limit enforced) without a server.
+//
+// Sync rows are full upserts keyed by the client's UUID. `updated_at` must
+// never go backwards (last writer wins) and `server_updated_at` must be the
+// server's commit time, which is what clients page their pulls by. Rows live
+// under their household's path, so they can't reference another household.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function me() {
+      return request.auth.uid;
+    }
+
+    function householdPath(hid) {
+      return /databases/$(database)/documents/households/$(hid);
+    }
+
+    function memberPath(hid, uid) {
+      return /databases/$(database)/documents/households/$(hid)/members/$(uid);
+    }
+
+    function invitePath(code) {
+      return /databases/$(database)/documents/invites/$(code);
+    }
+
+    function isMember(hid) {
+      return signedIn() && exists(memberPath(hid, me()));
+    }
+
+    function canEdit(hid) {
+      return isMember(hid) && get(memberPath(hid, me())).data.role in ['owner', 'editor'];
+    }
+
+    // Free households hold 3 people; the RevenueCat webhook sets ownerPro.
+    function memberLimit(household) {
+      return household.ownerPro == true ? 50 : 3;
+    }
+
+    function validName(name) {
+      return name is string && name.size() > 0 && name.size() <= 60;
+    }
+
+    // ───────────────────────── households ─────────────────────────
+
+    match /households/{hid} {
+      allow read: if isMember(hid);
+
+      // Bootstrap: create your own household together with your owner membership.
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['name', 'ownerId', 'memberIds', 'ownerPro', 'createdAt'])
+        && validName(request.resource.data.name)
+        && request.resource.data.ownerId == me()
+        && request.resource.data.memberIds == [me()]
+        && request.resource.data.ownerPro == false
+        && getAfter(memberPath(hid, me())).data.role == 'owner';
+
+      allow update: if signedIn() && (isRename() || isJoin(hid) || isRemoval(hid));
+
+      function isRename() {
+        return resource.data.ownerId == me()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name'])
+          && validName(request.resource.data.name);
+      }
+
+      // Joining with an invite: add yourself, within the member limit. The
+      // member doc (validated against the invite) is written in the same batch.
+      function isJoin(hid) {
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds'])
+          && !(me() in resource.data.memberIds)
+          && request.resource.data.memberIds.toSet() == resource.data.memberIds.toSet().union([me()].toSet())
+          && request.resource.data.memberIds.size() == resource.data.memberIds.size() + 1
+          && request.resource.data.memberIds.size() <= memberLimit(resource.data)
+          && !exists(memberPath(hid, me()))
+          && existsAfter(memberPath(hid, me()));
+      }
+
+      // Leaving, or the owner removing someone: exactly one id goes (named in
+      // lastRemoved, since rules can't pull it out of a set), never the
+      // owner's, and its member doc is deleted in the same batch.
+      function isRemoval(hid) {
+        let gone = request.resource.data.lastRemoved;
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds', 'lastRemoved'])
+          && gone is string
+          && resource.data.memberIds.toSet().difference(request.resource.data.memberIds.toSet()) == [gone].toSet()
+          && request.resource.data.memberIds.size() == resource.data.memberIds.size() - 1
+          && gone != resource.data.ownerId
+          && (gone == me() || resource.data.ownerId == me())
+          && !existsAfter(memberPath(hid, gone));
+      }
+
+      // ───────────────────────── members ─────────────────────────
+
+      match /members/{uid} {
+        allow read: if isMember(hid);
+
+        allow create: if signedIn()
+          && uid == me()
+          && request.resource.data.keys().hasOnly(['userId', 'role', 'email', 'displayName', 'joinedAt', 'inviteCode'])
+          && request.resource.data.userId == me()
+          && (isOwnerBootstrap(hid) || isInviteJoin(hid));
+
+        function isOwnerBootstrap(hid) {
+          return request.resource.data.role == 'owner'
+            && !exists(householdPath(hid))
+            && getAfter(householdPath(hid)).data.ownerId == me();
+        }
+
+        function isInviteJoin(hid) {
+          let code = request.resource.data.inviteCode;
+          let invite = get(invitePath(code)).data;
+          return code is string
+            && exists(invitePath(code))
+            && invite.householdId == hid
+            && invite.role == request.resource.data.role
+            && invite.role in ['editor', 'viewer']
+            && invite.revoked == false
+            && invite.expiresAt > request.time
+            && invite.useCount < invite.maxUses
+            && getAfter(invitePath(code)).data.useCount == invite.useCount + 1
+            && me() in getAfter(householdPath(hid)).data.memberIds;
+        }
+
+        // The owner switches other members between editor and viewer.
+        allow update: if signedIn()
+          && uid != me()
+          && get(householdPath(hid)).data.ownerId == me()
+          && resource.data.role != 'owner'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role'])
+          && request.resource.data.role in ['editor', 'viewer'];
+
+        // Leave yourself, or the owner removes you; memberIds shrinks in the same batch.
+        allow delete: if signedIn()
+          && resource.data.role != 'owner'
+          && (uid == me() || get(householdPath(hid)).data.ownerId == me())
+          && !(uid in getAfter(householdPath(hid)).data.memberIds);
+      }
+
+      // ───────────────────────── synced data ─────────────────────────
+
+      match /{table}/{id} {
+        function isSyncedTable() {
+          return table in ['lists', 'items', 'pantry_items', 'recipes', 'meal_plan_entries', 'purchases'];
+        }
+
+        function validRow() {
+          let row = request.resource.data;
+          return row.id == id
+            && row.household_id == hid
+            && row.size() <= 40
+            && row.updated_at is timestamp
+            && row.updated_at <= request.time + duration.value(5, 'm')
+            && row.server_updated_at == request.time
+            && (row.deleted_at == null || row.deleted_at is string)
+            && (resource == null || row.updated_at >= resource.data.updated_at);
+        }
+
+        allow read: if isSyncedTable() && isMember(hid);
+        allow create, update: if isSyncedTable() && canEdit(hid) && validRow();
+        // Deletes are soft (deleted_at) so every device hears about them.
+        allow delete: if false;
+      }
+    }
+
+    // ───────────────────────── memberships by user ─────────────────────────
+
+    // "Which households am I in?" is a collection-group query on members.
+    match /{path=**}/members/{uid} {
+      allow read: if signedIn() && resource.data.userId == me();
+    }
+
+    // ───────────────────────── invites ─────────────────────────
+
+    match /invites/{code} {
+      // Anyone signed in can look up a code they were given, but not list codes.
+      allow get: if signedIn();
+      allow list: if false;
+
+      allow create: if signedIn()
+        && code.matches('^[A-Z0-9]{10}$')
+        && request.resource.data.keys().hasOnly(['householdId', 'role', 'createdBy', 'createdAt', 'expiresAt', 'maxUses', 'useCount', 'revoked'])
+        && canEdit(request.resource.data.householdId)
+        && request.resource.data.createdBy == me()
+        && request.resource.data.role in ['editor', 'viewer']
+        && request.resource.data.useCount == 0
+        && request.resource.data.maxUses == 5
+        && request.resource.data.revoked == false
+        && request.resource.data.expiresAt is timestamp
+        && request.resource.data.expiresAt > request.time
+        && request.resource.data.expiresAt <= request.time + duration.value(8, 'd');
+
+      allow update: if signedIn() && (isRedeem() || isRevoke());
+
+      // Counted alongside the redeemer's new membership (checked on the member doc).
+      function isRedeem() {
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['useCount'])
+          && request.resource.data.useCount == resource.data.useCount + 1
+          && !exists(memberPath(resource.data.householdId, me()))
+          && existsAfter(memberPath(resource.data.householdId, me()));
+      }
+
+      function isRevoke() {
+        return canEdit(resource.data.householdId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['revoked'])
+          && request.resource.data.revoked == true;
+      }
+
+      allow delete: if canEdit(resource.data.householdId);
+    }
+
+    // ───────────────────────── per-user docs ─────────────────────────
+
+    match /users/{uid} {
+      allow read: if signedIn() && uid == me();
+      allow create, update: if signedIn()
+        && uid == me()
+        && request.resource.data.keys().hasOnly(['householdSize', 'dietaryPreferences', 'monthlyBudget', 'currency', 'updatedAt']);
+    }
+
+    // Written only by the RevenueCat webhook (Admin SDK bypasses rules).
+    match /subscriptions/{uid} {
+      allow read: if signedIn() && uid == me();
+      allow write: if false;
+    }
+  }
+}

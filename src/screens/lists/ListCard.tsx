@@ -32,27 +32,36 @@ export function ListCard({ list, counts, onPress, onMenu }: {
     const done = counts?.done ?? 0;
     const remaining = total - done;
     const detail = total === 0 ? 'Empty' : remaining === 0 ? 'All done' : `${remaining} to get${done ? ` · ${done} in cart` : ''}`;
+    // The menu button sits beside the card's pressable, not inside it (nested buttons are invalid on web).
     return (
-        <Card onPress={onPress} onLongPress={onMenu} accessibilityLabel={`${list.name}, ${detail}`} style={styles.card}>
-            <View style={[styles.icon, { backgroundColor: list.color }]}>
-                <Ionicons name={list.isTemplate ? 'copy' : 'cart'} size={20} color="#fff" />
-            </View>
-            <View style={styles.body}>
-                <Text variant="subheading" numberOfLines={1}>
-                    {list.name}
-                </Text>
-                <Text variant="caption" muted numberOfLines={1}>
-                    {[detail, list.storeName].filter(Boolean).join(' · ')}
-                </Text>
-                {total > 0 && !list.isTemplate ? <ProgressBar value={done / total} color={list.color} /> : null}
-            </View>
-            {onMenu ? <IconButton icon="ellipsis-horizontal" label={`${list.name} options`} onPress={onMenu} color={colors.textMuted} /> : null}
-        </Card>
+        <View>
+            <Card onPress={onPress} onLongPress={onMenu} accessibilityLabel={`${list.name}, ${detail}`} style={[styles.card, onMenu && styles.withMenu]}>
+                <View style={[styles.icon, { backgroundColor: list.color }]}>
+                    <Ionicons name={list.isTemplate ? 'copy' : 'cart'} size={20} color="#fff" />
+                </View>
+                <View style={styles.body}>
+                    <Text variant="subheading" numberOfLines={1}>
+                        {list.name}
+                    </Text>
+                    <Text variant="caption" muted numberOfLines={1}>
+                        {[detail, list.storeName].filter(Boolean).join(' · ')}
+                    </Text>
+                    {total > 0 && !list.isTemplate ? <ProgressBar value={done / total} color={list.color} /> : null}
+                </View>
+            </Card>
+            {onMenu ? (
+                <View style={styles.menu}>
+                    <IconButton icon="ellipsis-horizontal" label={`${list.name} options`} onPress={onMenu} color={colors.textMuted} />
+                </View>
+            ) : null}
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
     card: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md },
+    withMenu: { paddingRight: 56 },
+    menu: { position: 'absolute', right: spacing.sm, top: 0, bottom: 0, justifyContent: 'center' },
     icon: { width: 42, height: 42, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
     body: { flex: 1, gap: 4 },
 });

@@ -92,6 +92,18 @@ export function roundQuantity(value: number): number {
 
 const FRACTIONS: [number, string][] = [[0.25, '¼'], [0.333, '⅓'], [0.5, '½'], [0.667, '⅔'], [0.75, '¾']];
 
+// Word units take a plural; abbreviations (g, lb, tbsp, fl oz…) never do.
+const PLURALS: Record<string, string> = {
+    cup: 'cups', pack: 'packs', bag: 'bags', box: 'boxes', can: 'cans', bottle: 'bottles', jar: 'jars',
+    carton: 'cartons', bunch: 'bunches', head: 'heads', loaf: 'loaves', clove: 'cloves', slice: 'slices',
+    stick: 'sticks', roll: 'rolls',
+};
+
+/** "cup" → "cups" for quantities above one; fractions and 1 stay singular ("½ cup"). */
+export function unitLabel(unit: string, quantity: number | null | undefined): string {
+    return quantity != null && quantity > 1 && PLURALS[unit] ? PLURALS[unit] : unit;
+}
+
 export function formatQuantity(quantity: number | null | undefined, unit?: string | null): string {
     if (quantity == null) return unit ?? '';
     const whole = Math.floor(quantity);
@@ -100,5 +112,5 @@ export function formatQuantity(quantity: number | null | undefined, unit?: strin
     const match = FRACTIONS.find(([v]) => Math.abs(v - frac) < 0.02);
     if (match && quantity < 20) text = `${whole > 0 ? whole : ''}${match[1]}`;
     if (!unit || unit === 'pc') return text;
-    return `${text} ${unit}`;
+    return `${text} ${unitLabel(unit, quantity)}`;
 }

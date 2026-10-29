@@ -5,10 +5,10 @@ const expoConfig = require('eslint-config-expo/flat');
 module.exports = defineConfig([
     expoConfig,
     {
-        ignores: ['dist/*', 'web-build/*', 'node_modules/*', '.expo/*'],
+        ignores: ['dist/*', 'web-build/*', 'node_modules/*', '.expo/*', 'functions/lib/*', 'functions/node_modules/*'],
     },
     {
-        files: ['supabase/tests/**/*.js', 'jest.setup.js', '**/__tests__/**'],
+        files: ['firebase/tests/**/*.js', 'jest.setup.js', '**/__tests__/**'],
         languageOptions: { globals: { jest: 'readonly', describe: 'readonly', test: 'readonly', expect: 'readonly', beforeAll: 'readonly', beforeEach: 'readonly', afterEach: 'readonly', it: 'readonly' } },
     },
 ]);

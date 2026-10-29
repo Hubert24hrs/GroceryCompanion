@@ -1,6 +1,6 @@
 import { autoCategorize } from '../../domain/categories';
 import { today } from '../../domain/dates';
-import { checkDuplicate, DuplicateWarning, findPantryMatch, itemKey } from '../../domain/pantry';
+import { checkDuplicate, defaultPantryLocation, DuplicateWarning, findPantryMatch, itemKey } from '../../domain/pantry';
 import { ParsedItem, displayName } from '../../domain/parsing';
 import { Category, ListItem } from '../../domain/types';
 import { convert, roundQuantity } from '../../domain/units';
@@ -201,7 +201,7 @@ function restockPantry(item: ListItem) {
         unit: item.unit,
         lowStockThreshold: null,
         expiresOn: null,
-        location: item.category === 'frozen' ? 'freezer' : ['dairy', 'meat', 'seafood'].includes(item.category) ? 'fridge' : 'pantry',
+        location: defaultPantryLocation(item.category),
         barcode: item.barcode,
         notes: null,
     });

@@ -1,5 +1,5 @@
 // Core domain types. Dates are ISO-8601 strings so records serialize
-// identically to SQLite, localStorage and Supabase.
+// identically to SQLite, localStorage and Firestore.
 
 export type Category =
     | 'produce'
@@ -21,7 +21,7 @@ export type Role = 'owner' | 'editor' | 'viewer';
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 
-/** Fields shared by every record that syncs to Supabase. */
+/** Fields shared by every record that syncs to the backend. */
 export interface SyncedRecord {
     id: string;
     householdId: string;

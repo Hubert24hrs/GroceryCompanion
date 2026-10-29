@@ -156,33 +156,35 @@ export function MealPlanScreen({ navigation }: TabScreenProps<'MealPlan'>) {
                             ) : (
                                 entries.map(m => {
                                     const recipe = m.recipeId ? recipeById.get(m.recipeId) : undefined;
+                                    // Options button beside the row's pressable, not inside it (nested buttons are invalid on web).
                                     return (
-                                        <Pressable
-                                            key={m.id}
-                                            onPress={() => (recipe ? navigation.navigate('RecipeDetail', { recipeId: recipe.id }) : editable && setTarget({ entry: m }))}
-                                            onLongPress={editable ? () => setMenuFor(m) : undefined}
-                                            accessibilityRole="button"
-                                            accessibilityLabel={`${MEAL_LABEL[m.mealType]}: ${title(m)}`}
-                                            style={({ pressed }) => [styles.entry, pressed && { opacity: 0.7 }]}
-                                        >
-                                            {recipe ? (
-                                                <RecipeImage recipe={recipe} style={styles.entryThumb} />
-                                            ) : (
-                                                <View style={[styles.entryThumb, styles.noteThumb, { backgroundColor: colors.accentSoft }]}>
-                                                    <Ionicons name="create-outline" size={18} color={colors.accent} />
+                                        <View key={m.id} style={styles.entryRow}>
+                                            <Pressable
+                                                onPress={() => (recipe ? navigation.navigate('RecipeDetail', { recipeId: recipe.id }) : editable && setTarget({ entry: m }))}
+                                                onLongPress={editable ? () => setMenuFor(m) : undefined}
+                                                accessibilityRole="button"
+                                                accessibilityLabel={`${MEAL_LABEL[m.mealType]}: ${title(m)}`}
+                                                style={({ pressed }) => [styles.entry, pressed && { opacity: 0.7 }]}
+                                            >
+                                                {recipe ? (
+                                                    <RecipeImage recipe={recipe} style={styles.entryThumb} />
+                                                ) : (
+                                                    <View style={[styles.entryThumb, styles.noteThumb, { backgroundColor: colors.accentSoft }]}>
+                                                        <Ionicons name="create-outline" size={18} color={colors.accent} />
+                                                    </View>
+                                                )}
+                                                <View style={{ flex: 1 }}>
+                                                    <Text variant="caption" muted style={{ fontWeight: '600' }}>
+                                                        {MEAL_LABEL[m.mealType]}
+                                                        {recipe && m.servings ? ` · ${m.servings} serving${m.servings === 1 ? '' : 's'}` : ''}
+                                                    </Text>
+                                                    <Text numberOfLines={1}>{title(m)}</Text>
                                                 </View>
-                                            )}
-                                            <View style={{ flex: 1 }}>
-                                                <Text variant="caption" muted style={{ fontWeight: '600' }}>
-                                                    {MEAL_LABEL[m.mealType]}
-                                                    {recipe && m.servings ? ` · ${m.servings} serving${m.servings === 1 ? '' : 's'}` : ''}
-                                                </Text>
-                                                <Text numberOfLines={1}>{title(m)}</Text>
-                                            </View>
+                                            </Pressable>
                                             {editable ? (
                                                 <IconButton icon="ellipsis-horizontal" label={`Options for ${title(m)}`} onPress={() => setMenuFor(m)} color={colors.textMuted} />
                                             ) : null}
-                                        </Pressable>
+                                        </View>
                                     );
                                 })
                             )}
@@ -234,7 +236,8 @@ const styles = StyleSheet.create({
         paddingHorizontal: spacing.md,
         paddingVertical: 6,
     },
-    entry: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+    entryRow: { flexDirection: 'row', alignItems: 'center' },
+    entry: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
     entryThumb: { width: 44, height: 44, borderRadius: radius.sm },
     noteThumb: { alignItems: 'center', justifyContent: 'center' },
 });

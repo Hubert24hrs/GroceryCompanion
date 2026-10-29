@@ -1,0 +1,145 @@
+import { consolidateIngredients, itemsToBuy } from '../aggregate';
+import { autoCategorize } from '../categories';
+import { defaultPantryLocation, expiryStatus, isLowStock, itemKey } from '../pantry';
+import { parseItems, parseNumber } from '../parsing';
+import { PantryItem, Recipe } from '../types';
+import { convert, formatQuantity, unitLabel } from '../units';
+
+describe('units', () => {
+    test('word units pluralise above one; fractions and abbreviations do not', () => {
+        expect(formatQuantity(2, 'cup')).toBe('2 cups');
+        expect(formatQuantity(1.333, 'cup')).toBe('1⅓ cups');
+        expect(formatQuantity(0.5, 'cup')).toBe('½ cup');
+        expect(formatQuantity(1, 'can')).toBe('1 can');
+        expect(formatQuantity(3, 'box')).toBe('3 boxes');
+        expect(formatQuantity(2, 'loaf')).toBe('2 loaves');
+        expect(formatQuantity(500, 'g')).toBe('500 g');
+        expect(formatQuantity(2, 'lb')).toBe('2 lb');
+        expect(formatQuantity(6, null)).toBe('6');
+        expect(unitLabel('tbsp', 4)).toBe('tbsp');
+    });
+
+    test('converts within a family only', () => {
+        expect(convert(1, 'kg', 'g')).toBe(1000);
+        expect(convert(1, 'dozen', null)).toBe(12);
+        expect(convert(1, 'cup', 'g')).toBeNull();
+    });
+});
+
+describe('parsing', () => {
+    test('splits and parses a quick-add line', () => {
+        const items = parseItems('2 lb chicken breast, milk, 6 eggs');
+        expect(items.map(i => [i.name, i.quantity, i.unit])).toEqual([
+            ['chicken breast', 2, 'lb'],
+            ['milk', null, null],
+            ['eggs', 6, null],
+        ]);
+    });
+
+    test('keeps "and" inside names', () => {
+        expect(parseItems('mac and cheese').map(i => i.name)).toEqual(['mac and cheese']);
+    });
+
+    test('reads fractions', () => {
+        expect(parseNumber('½')).toBe(0.5);
+        expect(parseNumber('1/4')).toBe(0.25);
+        expect(parseNumber('1½')).toBe(1.5);
+    });
+});
+
+describe('categories', () => {
+    test('picks the longest keyword, not the first', () => {
+        expect(autoCategorize('ice cream')).toBe('frozen');
+        expect(autoCategorize('bananas')).toBe('produce');
+    });
+});
+
+describe('pantry', () => {
+    const item = (extra: Partial<PantryItem>): PantryItem => ({
+        id: 'p',
+        householdId: 'h',
+        createdAt: '',
+        updatedAt: '',
+        deletedAt: null,
+        name: 'Milk',
+        category: 'dairy',
+        quantity: 2,
+        unit: null,
+        lowStockThreshold: null,
+        expiresOn: null,
+        location: 'fridge',
+        barcode: null,
+        notes: null,
+        ...extra,
+    });
+
+    test('one default location for hand-added and restocked items', () => {
+        expect(defaultPantryLocation('produce')).toBe('fridge');
+        expect(defaultPantryLocation('dairy')).toBe('fridge');
+        expect(defaultPantryLocation('frozen')).toBe('freezer');
+        expect(defaultPantryLocation('pantry')).toBe('pantry');
+        expect(defaultPantryLocation('household')).toBe('pantry');
+    });
+
+    test('low stock and expiry', () => {
+        expect(isLowStock(item({ quantity: 0 }))).toBe(true);
+        expect(isLowStock(item({ quantity: 1, lowStockThreshold: 1 }))).toBe(true);
+        expect(isLowStock(item({ quantity: 3, lowStockThreshold: 1 }))).toBe(false);
+        expect(expiryStatus(item({ expiresOn: '2026-10-28' }), '2026-10-29')).toBe('expired');
+        expect(expiryStatus(item({ expiresOn: '2026-10-31' }), '2026-10-29')).toBe('soon');
+        expect(expiryStatus(item({ expiresOn: '2026-12-01' }), '2026-10-29')).toBe('ok');
+    });
+
+    test('item keys ignore case and plurals', () => {
+        expect(itemKey('Bananas')).toBe(itemKey('banana'));
+    });
+});
+
+describe('ingredient consolidation', () => {
+    const recipe = (id: string, servings: number, ingredients: Recipe['ingredients']): Recipe => ({
+        id,
+        householdId: 'h',
+        createdAt: '',
+        updatedAt: '',
+        deletedAt: null,
+        title: id,
+        description: null,
+        imageUrl: null,
+        sourceName: null,
+        sourceUrl: null,
+        prepMinutes: null,
+        cookMinutes: null,
+        servings,
+        calories: null,
+        ingredients,
+        instructions: [],
+        tags: [],
+        collection: null,
+        isFavorite: false,
+        estimatedCost: null,
+    });
+
+    test('scales by servings and merges compatible units across recipes', () => {
+        const a = recipe('Pancakes', 2, [{ name: 'Milk', quantity: 1, unit: 'cup', category: 'dairy' }]);
+        const b = recipe('Smoothie', 1, [{ name: 'milk', quantity: 250, unit: 'ml', category: 'dairy' }]);
+        const [milk] = consolidateIngredients([
+            { recipe: a, servings: 4 },
+            { recipe: b, servings: 1 },
+        ]);
+        // 2 cups (scaled) + 250 ml ≈ 3.06 cups
+        expect(milk.unit).toBe('cup');
+        expect(milk.quantity).toBeCloseTo(3.06, 1);
+        expect(milk.sources).toEqual(['Pancakes', 'Smoothie']);
+    });
+
+    test('pantry stock is subtracted and covered lines are not bought', () => {
+        const r = recipe('Toast', 1, [
+            { name: 'Bread', quantity: 2, unit: null, category: 'bakery' },
+            { name: 'Butter', quantity: 1, unit: 'tbsp', category: 'dairy' },
+        ]);
+        const pantry = [{ name: 'butter', deletedAt: null, quantity: 10, unit: 'tbsp' }] as PantryItem[];
+        const lines = consolidateIngredients([{ recipe: r, servings: 1 }], pantry);
+        expect(lines.find(l => l.name === 'Butter')?.status).toBe('in-pantry');
+        expect(itemsToBuy(lines).map(l => l.name)).toEqual(['Bread']);
+    });
+});

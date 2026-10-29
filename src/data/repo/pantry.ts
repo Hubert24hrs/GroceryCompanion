@@ -1,5 +1,5 @@
 import { autoCategorize } from '../../domain/categories';
-import { findPantryMatch, isLowStock } from '../../domain/pantry';
+import { defaultPantryLocation, findPantryMatch, isLowStock } from '../../domain/pantry';
 import { displayName } from '../../domain/parsing';
 import { Category, PantryItem, PantryLocation } from '../../domain/types';
 import { convert, roundQuantity } from '../../domain/units';
@@ -16,12 +16,6 @@ export interface PantryInput {
     location?: PantryLocation;
     barcode?: string | null;
     notes?: string | null;
-}
-
-function defaultLocation(category: Category): PantryLocation {
-    if (category === 'frozen') return 'freezer';
-    if (['dairy', 'meat', 'seafood', 'produce'].includes(category)) return 'fridge';
-    return 'pantry';
 }
 
 /** Add stock; merges into an existing pantry row for the same product. */
@@ -50,7 +44,7 @@ export function addPantryItem(input: PantryInput): PantryItem {
         unit: input.unit ?? null,
         lowStockThreshold: input.lowStockThreshold ?? null,
         expiresOn: input.expiresOn ?? null,
-        location: input.location ?? defaultLocation(category),
+        location: input.location ?? defaultPantryLocation(category),
         barcode: input.barcode ?? null,
         notes: input.notes ?? null,
     });

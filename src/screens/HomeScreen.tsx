@@ -192,8 +192,8 @@ export function HomeScreen({ navigation }: TabScreenProps<'Home'>) {
             </View>
 
             <View>
-                <SectionTitle title="Spending this month" />
-                <Card style={{ gap: spacing.sm }}>
+                <SectionTitle title="Spending this month" action="Details" onAction={() => navigation.navigate('Spending')} />
+                <Card style={{ gap: spacing.sm }} onPress={() => navigation.navigate('Spending')} accessibilityLabel="Open spending details">
                     <View style={styles.spendRow}>
                         <Text variant="title" style={{ fontSize: 26 }}>
                             {formatMoney(spent)}

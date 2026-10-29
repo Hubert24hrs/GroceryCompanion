@@ -15,8 +15,7 @@ export type ProFeature =
     | 'listTemplates'
     | 'fullAnalytics'
     | 'priceInsights'
-    | 'smartSuggestions'
-    | 'adFree';
+    | 'smartSuggestions';
 
 export const PRO_FEATURES: { feature: ProFeature; title: string; detail: string; icon: string }[] = [
     { feature: 'unlimitedLists', title: 'Unlimited lists', detail: `Free includes ${FREE_LIMITS.activeLists} active lists`, icon: 'list' },
@@ -26,7 +25,6 @@ export const PRO_FEATURES: { feature: ProFeature; title: string; detail: string;
     { feature: 'smartSuggestions', title: 'Smart meal ideas', detail: 'Ranked by pantry, expiry, diet and budget', icon: 'sparkles' },
     { feature: 'fullAnalytics', title: 'Full spending history', detail: 'Trends, categories and savings insights', icon: 'stats-chart' },
     { feature: 'priceInsights', title: 'Price tracking', detail: 'See where each item was cheapest', icon: 'pricetags' },
-    { feature: 'adFree', title: 'No ads', detail: 'A calmer shopping experience', icon: 'ban' },
 ];
 
 export function hasFeature(isPro: boolean, _feature: ProFeature): boolean {

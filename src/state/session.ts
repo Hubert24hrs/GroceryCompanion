@@ -1,27 +1,32 @@
 import NetInfo from '@react-native-community/netinfo';
-import { Session } from '@supabase/supabase-js';
+import {
+    createUserWithEmailAndPassword,
+    onAuthStateChanged,
+    sendPasswordResetEmail,
+    signInWithEmailAndPassword,
+    signOut as firebaseSignOut,
+    User,
+} from 'firebase/auth';
 import { v4 as uuidv4 } from 'uuid';
 import { create } from 'zustand';
-import { Household, HouseholdMember, Invite, Role, SYNCED_TABLES } from '../domain/types';
+import { HouseholdMember, Invite, Role, SYNCED_TABLES } from '../domain/types';
 import { META, openLocalDatabase, seedStarterRecipes } from '../data/bootstrap';
 import { getDb } from '../data/db';
 import { createAdapter } from '../data/storage/createAdapter';
 import { MemoryAdapter } from '../data/storage/memoryAdapter';
+import { auth, isBackendConfigured } from '../services/firebase';
+import * as backend from '../services/household';
 import { configurePurchases, onProStatusChange } from '../services/purchases';
-import { supabase } from '../services/supabase';
 import { usePrefs } from './prefs';
 import { syncController } from './sync';
 
-export interface Membership {
-    household: Household;
-    role: Role;
-}
+export type Membership = backend.Membership;
 
 interface SessionState {
     ready: boolean;
     storageWarning: string | null;
     onboarded: boolean;
-    user: { id: string; email: string | null } | null;
+    user: backend.SignedInUser | null;
     memberships: Membership[];
     householdName: string;
     role: Role;
@@ -51,59 +56,71 @@ interface SessionState {
 
 export const useIsPro = () => useSession(s => s.storePro === true || s.accountPro);
 
-function requireClient() {
-    if (!supabase) throw new Error('Accounts are not configured for this build.');
-    return supabase;
+function requireAuth() {
+    if (!auth) throw new Error('Accounts are not configured for this build.');
+    return auth;
 }
 
-/** Friendlier text for errors raised by our RPCs (they carry a hint). */
-function rpcError(error: { message: string; hint?: string | null }): Error {
-    return new Error(error.hint || error.message);
+const AUTH_MESSAGES: Record<string, string> = {
+    'auth/invalid-credential': 'Email or password is incorrect.',
+    'auth/wrong-password': 'Email or password is incorrect.',
+    'auth/user-not-found': 'Email or password is incorrect.',
+    'auth/invalid-email': 'Enter a valid email address.',
+    'auth/email-already-in-use': 'An account with this email already exists. Sign in instead.',
+    'auth/weak-password': 'Choose a stronger password (at least 8 characters, with a letter and a number).',
+    'auth/too-many-requests': 'Too many attempts. Wait a few minutes and try again.',
+    'auth/network-request-failed': "Can't reach the server. Check your connection and try again.",
+    'auth/user-disabled': 'This account has been disabled.',
+    'auth/operation-not-allowed': "Email sign-in isn't switched on for this app yet.",
+    'auth/configuration-not-found': "Email sign-in isn't switched on for this app yet.",
+};
+
+/** Friendly text for Firebase Auth errors. */
+function authError(e: unknown): Error {
+    const code = (e as { code?: string } | undefined)?.code;
+    return new Error((code && AUTH_MESSAGES[code]) || (e instanceof Error ? e.message : 'Something went wrong. Try again.'));
 }
+
+const toUser = (u: User): backend.SignedInUser => ({ id: u.uid, email: u.email });
 
 let authUnsubscribe: (() => void) | null = null;
 let proUnsubscribe: (() => void) | null = null;
 
 export const useSession = create<SessionState>((set, get) => {
     /** After sign-in: attach this device's data to the account's household and start syncing. */
-    async function linkAccount(session: Session) {
+    async function linkAccount(firebaseUser: User) {
         const db = getDb();
-        const client = requireClient();
-        const user = { id: session.user.id, email: session.user.email ?? null };
+        const user = toUser(firebaseUser);
         set({ user, linking: true });
         await db.setMeta(META.userId, user.id);
         db.setHousehold(db.householdId, user.id);
 
         const pro = configurePurchases(user.id).then(storePro => set({ storePro }));
         try {
-            const { data: hid, error } = await client.rpc('bootstrap_household', {
-                p_household_id: db.householdId,
-                p_name: 'My Household',
-            });
-            if (error) throw error;
-            if (hid && hid !== db.householdId) {
+            const hid = await backend.bootstrapHousehold(user, db.householdId);
+            if (hid !== db.householdId) {
                 // The account already has a household: drop starter recipes this
                 // device never touched (the account has its own), keep everything else.
                 for (const r of db.list('recipes')) {
                     if (r.sourceName === 'GroceryCompanion' && r.createdAt === r.updatedAt) db.discardLocal('recipes', r.id);
                 }
-                await db.reassignHousehold(db.householdId, hid as string);
-                await db.setMeta(META.activeHouseholdId, hid as string);
-                db.setHousehold(hid as string, user.id);
+                await db.reassignHousehold(db.householdId, hid);
+                await db.setMeta(META.activeHouseholdId, hid);
+                db.setHousehold(hid, user.id);
             }
             set({ linked: true });
             await usePrefs.getState().pullFromProfile(user.id);
             await get().refreshHousehold();
             syncController.start(user.id, db.householdId, () => void get().refreshHousehold());
         } catch (e) {
-            // Offline (e.g. app restored a session without network): keep working
+            // Offline (e.g. the app restored a session without network): keep working
             // locally and finish linking once we're back online. Syncing before
             // the household exists would only produce permission errors.
             console.warn('Household link deferred:', (e as Error).message);
             const unsubscribe = NetInfo.addEventListener(s => {
-                if (s.isConnected && s.isInternetReachable !== false && !get().linked) {
+                if (s.isConnected && s.isInternetReachable !== false && !get().linked && get().user?.id === user.id) {
                     unsubscribe();
-                    void linkAccount(session);
+                    void linkAccount(firebaseUser);
                 }
             });
         } finally {
@@ -120,11 +137,18 @@ export const useSession = create<SessionState>((set, get) => {
         await db.setMeta(META.localHouseholdId, localId);
         await db.setMeta(META.seeded, '1');
         await db.setMeta(META.legacyMigrated, '1');
+        await db.setMeta(META.seedImagesFixed, '1');
         await db.setMeta(META.onboarded, '1');
         db.setHousehold(localId, null);
         seedStarterRecipes(db);
         await db.flush();
         set({ user: null, linked: false, memberships: [], members: [], role: 'owner', householdName: 'My Household', accountPro: false });
+    }
+
+    function requireUser() {
+        const { user } = get();
+        if (!user) throw new Error('Sign in first.');
+        return user;
     }
 
     return {
@@ -160,20 +184,20 @@ export const useSession = create<SessionState>((set, get) => {
             proUnsubscribe?.();
             proUnsubscribe = onProStatusChange(pro => set({ storePro: pro }));
 
-            if (!supabase) {
+            if (!isBackendConfigured || !auth) {
                 set({ storePro: await configurePurchases(null) });
                 return;
             }
-            const { data } = await supabase.auth.getSession();
-            if (data.session) void linkAccount(data.session);
-            else set({ storePro: await configurePurchases(null) });
-
+            // Fires once with the restored session (or null), then on every sign-in/out.
+            let first = true;
             authUnsubscribe?.();
-            const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-                if (event === 'SIGNED_IN' && session && session.user.id !== get().user?.id) void linkAccount(session);
-                if (event === 'SIGNED_OUT' && get().user) void resetToLocal();
+            authUnsubscribe = onAuthStateChanged(auth, firebaseUser => {
+                const wasFirst = first;
+                first = false;
+                if (firebaseUser && firebaseUser.uid !== get().user?.id) void linkAccount(firebaseUser);
+                else if (!firebaseUser && get().user) void resetToLocal();
+                else if (!firebaseUser && wasFirst) void configurePurchases(null).then(storePro => set({ storePro }));
             });
-            authUnsubscribe = () => sub.subscription.unsubscribe();
         },
 
         completeOnboarding: async () => {
@@ -182,48 +206,47 @@ export const useSession = create<SessionState>((set, get) => {
         },
 
         signIn: async (email, password) => {
-            const { error } = await requireClient().auth.signInWithPassword({ email, password });
-            if (error) throw new Error(error.message === 'Invalid login credentials' ? 'Email or password is incorrect.' : error.message);
+            try {
+                await signInWithEmailAndPassword(requireAuth(), email, password);
+            } catch (e) {
+                throw authError(e);
+            }
             await get().completeOnboarding();
         },
 
         signUp: async (email, password) => {
-            const { data, error } = await requireClient().auth.signUp({ email, password });
-            if (error) throw error;
+            try {
+                await createUserWithEmailAndPassword(requireAuth(), email, password);
+            } catch (e) {
+                throw authError(e);
+            }
             await get().completeOnboarding();
-            return data.session ? 'signed-in' : 'confirm-email';
+            return 'signed-in';
         },
 
         resetPassword: async email => {
-            const { error } = await requireClient().auth.resetPasswordForEmail(email);
-            if (error) throw error;
+            try {
+                await sendPasswordResetEmail(requireAuth(), email);
+            } catch (e) {
+                // Don't reveal whether an account exists.
+                if ((e as { code?: string }).code !== 'auth/user-not-found') throw authError(e);
+            }
         },
 
         signOut: async () => {
-            const client = requireClient();
+            const a = requireAuth();
             await syncController.engine?.syncNow().catch(() => undefined);
-            const { error } = await client.auth.signOut();
-            if (error) throw error;
-            // onAuthStateChange(SIGNED_OUT) wipes this device's copy; do it here too in case it fired early.
+            await firebaseSignOut(a);
+            // onAuthStateChanged(null) wipes this device's copy; do it here too in case it fired early.
             if (get().user) await resetToLocal();
             set({ storePro: await configurePurchases(null) });
         },
 
         refreshHousehold: async () => {
             const { user, linked } = get();
-            if (!supabase || !user || !linked) return;
+            if (!isBackendConfigured || !user || !linked) return;
             const db = getDb();
-            const { data, error } = await supabase
-                .from('household_members')
-                .select('role, households(id, name, owner_id)')
-                .eq('user_id', user.id);
-            if (error) throw error;
-            const memberships: Membership[] = (data ?? [])
-                .filter((m: any) => m.households)
-                .map((m: any) => ({
-                    role: m.role as Role,
-                    household: { id: m.households.id, name: m.households.name, ownerId: m.households.owner_id },
-                }));
+            const memberships = await backend.myMemberships(user.id);
 
             // Forget data from households we no longer belong to.
             const ids = new Set(memberships.map(m => m.household.id));
@@ -240,29 +263,21 @@ export const useSession = create<SessionState>((set, get) => {
                 syncController.start(user.id, active.household.id, () => void get().refreshHousehold());
             }
 
-            const [{ data: members }, { data: sub }] = await Promise.all([
-                supabase.rpc('household_members_view', { p_household_id: db.householdId }),
-                supabase.from('subscriptions').select('is_pro, expires_at').eq('user_id', user.id).maybeSingle(),
+            const [members, accountPro] = await Promise.all([
+                active ? backend.loadMembers(db.householdId) : Promise.resolve([]),
+                backend.loadAccountPro(user.id).catch(() => false),
             ]);
             set({
                 memberships,
                 role: active?.role ?? 'owner',
                 householdName: active?.household.name ?? 'My Household',
-                members: (members ?? []).map((m: any) => ({
-                    householdId: db.householdId,
-                    userId: m.user_id,
-                    role: m.role,
-                    email: m.email,
-                    displayName: m.display_name,
-                    joinedAt: m.joined_at,
-                })),
-                accountPro: Boolean(sub?.is_pro && (!sub.expires_at || Date.parse(sub.expires_at) > Date.now())),
+                members,
+                accountPro,
             });
         },
 
         switchHousehold: async householdId => {
-            const { user } = get();
-            if (!user) return;
+            const user = requireUser();
             const db = getDb();
             await db.setMeta(META.activeHouseholdId, householdId);
             db.setHousehold(householdId, user.id);
@@ -271,56 +286,34 @@ export const useSession = create<SessionState>((set, get) => {
         },
 
         renameHousehold: async name => {
-            const { error } = await requireClient().from('households').update({ name }).eq('id', getDb().householdId);
-            if (error) throw error;
+            await backend.renameHousehold(getDb().householdId, name);
             await get().refreshHousehold();
         },
 
-        createInvite: async role => {
-            const { data, error } = await requireClient().rpc('create_invite', { p_household_id: getDb().householdId, p_role: role });
-            if (error) throw rpcError(error);
-            const row = Array.isArray(data) ? data[0] : data;
-            return { code: row.code, householdId: getDb().householdId, role, expiresAt: row.expires_at, maxUses: 5, useCount: 0 };
-        },
+        createInvite: async role => backend.createInvite(getDb().householdId, requireUser().id, role),
 
         joinHousehold: async code => {
-            const { data: hid, error } = await requireClient().rpc('accept_invite', { p_code: code });
-            if (error) throw rpcError(error);
-            // Rows of the new household predate our pull cursors: pull everything again.
-            await syncController.engine?.resetCursors();
-            await get().switchHousehold(hid as string);
+            const hid = await backend.acceptInvite(code, requireUser());
+            await get().switchHousehold(hid);
         },
 
         setMemberRole: async (userId, role) => {
-            const { error } = await requireClient()
-                .from('household_members')
-                .update({ role })
-                .eq('household_id', getDb().householdId)
-                .eq('user_id', userId);
-            if (error) throw error;
+            await backend.setMemberRole(getDb().householdId, userId, role);
             await get().refreshHousehold();
         },
 
         removeMember: async userId => {
-            const { error } = await requireClient()
-                .from('household_members')
-                .delete()
-                .eq('household_id', getDb().householdId)
-                .eq('user_id', userId);
-            if (error) throw error;
+            await backend.removeMember(getDb().householdId, userId);
             await get().refreshHousehold();
         },
 
         leaveHousehold: async () => {
-            const { user } = get();
-            if (!user) return;
+            const user = requireUser();
             const db = getDb();
             const leaving = db.householdId;
-            const { error } = await requireClient().from('household_members').delete().eq('household_id', leaving).eq('user_id', user.id);
-            if (error) throw error;
-            const { data: hid, error: e2 } = await requireClient().rpc('bootstrap_household', { p_household_id: null });
-            if (e2) throw e2;
-            await get().switchHousehold(hid as string);
+            await backend.removeMember(leaving, user.id);
+            const hid = await backend.ownHousehold(user);
+            await get().switchHousehold(hid);
             await db.removeHouseholdData(leaving);
         },
 

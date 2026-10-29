@@ -60,7 +60,7 @@ export function validateUrl(value: string): Result<string | null> {
     return ok(text);
 }
 
-// Household permissions (mirrors the RLS policies in supabase/migrations).
+// Household permissions (mirrors firestore.rules).
 export const canEdit = (role: Role | null | undefined) => role === 'owner' || role === 'editor';
 export const canManageMembers = (role: Role | null | undefined) => role === 'owner';
 export const canInvite = (role: Role | null | undefined) => role === 'owner' || role === 'editor';

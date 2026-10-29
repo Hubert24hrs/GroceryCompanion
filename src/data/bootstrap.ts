@@ -15,6 +15,7 @@ export const META = {
     prefs: 'preferences',
     userId: 'userId',
     lastSyncedAt: 'lastSyncedAt',
+    seedImagesFixed: 'seedImagesFixed',
 } as const;
 
 const LEGACY_MEAL_PLAN_KEY = 'grocery-companion-meal-plan';
@@ -80,7 +81,27 @@ export async function openLocalDatabase(adapter: StorageAdapter): Promise<LocalD
         await db.flush();
     }
 
+    if (!(await db.getMeta(META.seedImagesFixed))) {
+        repairSeedImages(db);
+        await db.setMeta(META.seedImagesFixed, '1');
+        await db.flush();
+    }
+
     await db.purgeTombstones();
     setDb(db);
     return db;
+}
+
+// Unsplash removed these starter-recipe photos; households seeded before the fix still point at them.
+const DEAD_SEED_IMAGES: Record<string, string> = {
+    'photo-1588137372308-15f75323a4dd': 'https://images.unsplash.com/photo-1588137378633-dea1336ce1e2?q=80&w=1200&auto=format&fit=crop',
+    'photo-1488477181946-6428a029177b': 'https://images.unsplash.com/photo-1567769541495-338ee7203e3c?q=80&w=1200&auto=format&fit=crop',
+    'photo-1529312266912-b33cf6227e2f': 'https://images.unsplash.com/photo-1769458313937-b5ad8f84942e?q=80&w=1200&auto=format&fit=crop',
+};
+
+function repairSeedImages(db: LocalDatabase) {
+    for (const r of db.all('recipes')) {
+        const dead = Object.keys(DEAD_SEED_IMAGES).find(id => r.imageUrl?.includes(id));
+        if (dead && !r.deletedAt) db.update('recipes', r.id, { imageUrl: DEAD_SEED_IMAGES[dead] });
+    }
 }

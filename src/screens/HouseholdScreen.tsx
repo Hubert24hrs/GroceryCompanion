@@ -7,7 +7,7 @@ import { getDb } from '../data/db';
 import { canAddMember, FREE_LIMITS } from '../domain/entitlements';
 import { HouseholdMember, Invite, Role } from '../domain/types';
 import { canInvite, canManageMembers, normalizeInviteCode, validateName } from '../domain/validation';
-import { isSupabaseConfigured } from '../services/supabase';
+import { isBackendConfigured } from '../services/firebase';
 import { useIsPro, useSession } from '../state/session';
 import { toast, toastError } from '../state/toast';
 import { Banner, Button, Card, Chip, EmptyState, Field, IconButton, Text } from '../ui/primitives';
@@ -44,7 +44,7 @@ export function HouseholdScreen({ navigation }: RootScreenProps<'Household'>) {
 
     const session = useSession.getState;
 
-    if (!isSupabaseConfigured || !user) {
+    if (!isBackendConfigured || !user) {
         return (
             <View style={[styles.root, { backgroundColor: colors.background }]}>
                 <ScrollView contentContainerStyle={styles.content}>
@@ -53,11 +53,11 @@ export function HouseholdScreen({ navigation }: RootScreenProps<'Household'>) {
                             icon="people-outline"
                             title="Shop together"
                             message={
-                                isSupabaseConfigured
+                                isBackendConfigured
                                     ? 'Sign in to share lists, pantry, recipes and the meal plan with your household. Everyone sees changes as they happen.'
                                     : "Sharing needs accounts, which aren't set up in this build. Everything you add is saved on this device."
                             }
-                            action={isSupabaseConfigured ? 'Sign in' : undefined}
+                            action={isBackendConfigured ? 'Sign in' : undefined}
                             onAction={() => setAuth('signin')}
                         />
                     </Card>

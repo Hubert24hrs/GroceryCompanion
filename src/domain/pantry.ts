@@ -1,6 +1,6 @@
 import { daysBetween } from './dates';
 import { convert, areCompatible } from './units';
-import { ListItem, PantryItem } from './types';
+import { Category, ListItem, PantryItem, PantryLocation } from './types';
 
 export type ExpiryStatus = 'expired' | 'soon' | 'ok' | 'none';
 
@@ -16,6 +16,13 @@ export function expiryStatus(item: Pick<PantryItem, 'expiresOn'>, todayIso: stri
 
 export function daysUntilExpiry(item: Pick<PantryItem, 'expiresOn'>, todayIso: string): number | null {
     return item.expiresOn ? daysBetween(todayIso, item.expiresOn) : null;
+}
+
+/** Where new stock goes by default, whether added by hand or restocked by a finished trip. */
+export function defaultPantryLocation(category: Category): PantryLocation {
+    if (category === 'frozen') return 'freezer';
+    if (category === 'dairy' || category === 'meat' || category === 'seafood' || category === 'produce') return 'fridge';
+    return 'pantry';
 }
 
 export function isLowStock(item: Pick<PantryItem, 'quantity' | 'lowStockThreshold'>): boolean {

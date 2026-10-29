@@ -46,11 +46,11 @@ export function backoffMs(attempts: number, random = Math.random): number {
 }
 
 /**
- * Two-way sync between the local outbox and Supabase.
+ * Two-way sync between the local outbox and the remote (Firestore).
  *
  * Push: every queued record is sent as a full-row upsert keyed by its client
- * UUID, so retries are idempotent. A server trigger ignores writes older than
- * the stored row (last writer wins on updated_at).
+ * UUID, so retries are idempotent. Writes older than the stored row are skipped
+ * (last writer wins on updated_at; the security rules enforce it too).
  *
  * Pull: per-table cursor on (server_updated_at, id), paged. A remote row
  * replaces the local one unless the local copy has a newer unsynced change.

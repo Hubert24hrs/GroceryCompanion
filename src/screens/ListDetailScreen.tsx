@@ -43,6 +43,8 @@ export function ListDetailScreen({ route, navigation }: RootScreenProps<'ListDet
     const [formOpen, setFormOpen] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [finishing, setFinishing] = useState(false);
+    // Frozen when the sheet opens, so it doesn't flash "0 items" while closing after the trip is saved.
+    const [trip, setTrip] = useState({ count: 0, total: 0, remaining: 0 });
     const [restock, setRestock] = useState(true);
 
     const items = useMemo(() => allItems.filter(i => i.listId === listId), [allItems, listId]);
@@ -218,7 +220,10 @@ export function ListDetailScreen({ route, navigation }: RootScreenProps<'ListDet
                             title={`Finish trip · ${checked.length} item${checked.length === 1 ? '' : 's'}${cartTotal ? ` · ${formatMoney(cartTotal)}` : ''}`}
                             icon="checkmark-done"
                             variant="accent"
-                            onPress={() => setFinishing(true)}
+                            onPress={() => {
+                                setTrip({ count: checked.length, total: cartTotal, remaining });
+                                setFinishing(true);
+                            }}
                         />
                     </View>
                 </View>
@@ -245,8 +250,8 @@ export function ListDetailScreen({ route, navigation }: RootScreenProps<'ListDet
                 footer={<Button title="Save trip" icon="checkmark-done" variant="accent" onPress={finish} />}
             >
                 <Text muted>
-                    {checked.length} checked item{checked.length === 1 ? '' : 's'} will leave the list.
-                    {cartTotal > 0 ? ` ${formatMoney(cartTotal)} goes into your spending history.` : ' Add prices to items to track spending.'}
+                    {trip.count} checked item{trip.count === 1 ? '' : 's'} will leave the list.
+                    {trip.total > 0 ? ` ${formatMoney(trip.total)} goes into your spending history.` : ' Add prices to items to track spending.'}
                 </Text>
                 <View style={[styles.toggle, { backgroundColor: colors.surfaceAlt }]}>
                     <View style={{ flex: 1, gap: 2 }}>
@@ -257,9 +262,9 @@ export function ListDetailScreen({ route, navigation }: RootScreenProps<'ListDet
                     </View>
                     <Switch value={restock} onValueChange={setRestock} trackColor={{ true: colors.primary, false: colors.border }} />
                 </View>
-                {remaining > 0 ? (
+                {trip.remaining > 0 ? (
                     <Text variant="caption" muted>
-                        {remaining} unchecked item{remaining === 1 ? '' : 's'} will stay on the list.
+                        {trip.remaining} unchecked item{trip.remaining === 1 ? '' : 's'} will stay on the list.
                     </Text>
                 ) : null}
             </Sheet>

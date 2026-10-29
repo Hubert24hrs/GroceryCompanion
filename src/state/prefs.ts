@@ -2,7 +2,8 @@ import { create } from 'zustand';
 import { UserPreferences } from '../domain/types';
 import { META } from '../data/bootstrap';
 import { getDb } from '../data/db';
-import { supabase } from '../services/supabase';
+import { isBackendConfigured } from '../services/firebase';
+import { loadProfile, saveProfile } from '../services/household';
 
 export const DEFAULT_PREFS: UserPreferences = {
     householdSize: 2,
@@ -40,35 +41,26 @@ export const usePrefs = create<PrefsState>((set, get) => ({
         set({ prefs });
         await getDb().setMeta(META.prefs, JSON.stringify(prefs));
         const userId = getDb().actorId;
-        if (supabase && userId) {
-            const { error } = await supabase
-                .from('profiles')
-                .update({
-                    household_size: prefs.householdSize,
-                    dietary_preferences: prefs.dietary,
-                    monthly_budget: prefs.monthlyBudget,
-                    currency: prefs.currency,
-                    updated_at: new Date().toISOString(),
-                })
-                .eq('id', userId);
-            if (error) console.warn('Could not save preferences to your account:', error.message);
+        if (isBackendConfigured && userId) {
+            await saveProfile(userId, prefs).catch(e => console.warn('Could not save preferences to your account:', (e as Error).message));
         }
     },
 
     pullFromProfile: async userId => {
-        if (!supabase) return;
-        const { data } = await supabase
-            .from('profiles')
-            .select('household_size, dietary_preferences, monthly_budget, currency')
-            .eq('id', userId)
-            .maybeSingle();
-        if (!data) return;
+        if (!isBackendConfigured) return;
+        const remote = await loadProfile(userId).catch(() => null);
+        if (!remote) {
+            // First sign-in: the account starts with this device's preferences.
+            await saveProfile(userId, get().prefs).catch(() => undefined);
+            return;
+        }
+        const current = get().prefs;
         const prefs: UserPreferences = {
-            ...get().prefs,
-            householdSize: data.household_size ?? get().prefs.householdSize,
-            dietary: data.dietary_preferences ?? get().prefs.dietary,
-            monthlyBudget: data.monthly_budget == null ? get().prefs.monthlyBudget : Number(data.monthly_budget),
-            currency: data.currency ?? get().prefs.currency,
+            ...current,
+            householdSize: remote.householdSize ?? current.householdSize,
+            dietary: remote.dietary ?? current.dietary,
+            monthlyBudget: remote.monthlyBudget === undefined ? current.monthlyBudget : remote.monthlyBudget,
+            currency: remote.currency ?? current.currency,
         };
         set({ prefs });
         await getDb().setMeta(META.prefs, JSON.stringify(prefs));

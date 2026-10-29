@@ -25,14 +25,25 @@ type Filter = 'all' | 'favorites' | 'quick' | `collection:${string}`;
 function RecipeCard({ recipe, width, onPress, onFavorite }: { recipe: Recipe; width: DimensionValue; onPress: () => void; onFavorite?: () => void }) {
     const { colors } = useTheme();
     const minutes = totalMinutes(recipe);
+    // The heart sits beside the card's pressable, not inside it (nested buttons are invalid on web).
     return (
-        <Pressable
-            onPress={onPress}
-            accessibilityRole="button"
-            accessibilityLabel={`${recipe.title}${minutes ? `, ${formatMinutes(minutes)}` : ''}`}
-            style={({ pressed }) => [styles.card, { width, backgroundColor: colors.surface, borderColor: colors.border }, pressed && { opacity: 0.85 }]}
-        >
-            <RecipeImage recipe={recipe} style={styles.cardImage} />
+        <View style={{ width }}>
+            <Pressable
+                onPress={onPress}
+                accessibilityRole="button"
+                accessibilityLabel={`${recipe.title}${minutes ? `, ${formatMinutes(minutes)}` : ''}`}
+                style={({ pressed }) => [styles.card, { backgroundColor: colors.surface, borderColor: colors.border }, pressed && { opacity: 0.85 }]}
+            >
+                <RecipeImage recipe={recipe} style={styles.cardImage} />
+                <View style={styles.cardBody}>
+                    <Text variant="label" numberOfLines={2} style={{ fontSize: 15 }}>
+                        {recipe.title}
+                    </Text>
+                    <Text variant="caption" muted numberOfLines={1}>
+                        {[minutes ? formatMinutes(minutes) : null, `${recipe.servings} serving${recipe.servings === 1 ? '' : 's'}`].filter(Boolean).join(' · ')}
+                    </Text>
+                </View>
+            </Pressable>
             {onFavorite ? (
                 <Pressable
                     onPress={onFavorite}
@@ -44,15 +55,7 @@ function RecipeCard({ recipe, width, onPress, onFavorite }: { recipe: Recipe; wi
                     <Ionicons name={recipe.isFavorite ? 'heart' : 'heart-outline'} size={18} color={recipe.isFavorite ? colors.danger : colors.textMuted} />
                 </Pressable>
             ) : null}
-            <View style={styles.cardBody}>
-                <Text variant="label" numberOfLines={2} style={{ fontSize: 15 }}>
-                    {recipe.title}
-                </Text>
-                <Text variant="caption" muted numberOfLines={1}>
-                    {[minutes ? formatMinutes(minutes) : null, `${recipe.servings} serving${recipe.servings === 1 ? '' : 's'}`].filter(Boolean).join(' · ')}
-                </Text>
-            </View>
-        </Pressable>
+        </View>
     );
 }
 

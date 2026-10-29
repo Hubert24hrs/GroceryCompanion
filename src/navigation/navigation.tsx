@@ -22,6 +22,7 @@ import { RecipeDetailScreen } from '../screens/RecipeDetailScreen';
 import { RecipeEditScreen } from '../screens/RecipeEditScreen';
 import { RecipesScreen } from '../screens/RecipesScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
+import { SpendingScreen } from '../screens/SpendingScreen';
 import { IconName } from '../ui/primitives';
 import { useTheme } from '../ui/theme';
 
@@ -41,6 +42,7 @@ export type RootStackParamList = {
     Settings: undefined;
     Household: undefined;
     Pro: undefined;
+    Spending: undefined;
 };
 
 export type RootScreenProps<T extends keyof RootStackParamList> = NativeStackScreenProps<RootStackParamList, T>;
@@ -111,6 +113,7 @@ export function RootNavigator() {
                 <Stack.Screen name="RecipeEdit" component={RecipeEditScreen} options={{ title: 'Recipe' }} />
                 <Stack.Screen name="Settings" component={SettingsScreen} />
                 <Stack.Screen name="Household" component={HouseholdScreen} />
+                <Stack.Screen name="Spending" component={SpendingScreen} />
                 <Stack.Screen name="Pro" component={ProScreen} options={{ title: 'Pro', presentation: 'modal' }} />
             </Stack.Navigator>
         </NavigationContainer>

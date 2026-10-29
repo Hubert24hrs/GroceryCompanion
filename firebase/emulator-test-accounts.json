@@ -1,0 +1,7 @@
+{
+  "_comment": "Accounts for manual testing against the local Auth emulator only (npm run emulators). They do not exist in the real project.",
+  "accounts": [
+    { "email": "alice@grocery.test", "password": "Grocery-Test-2026", "role": "household owner" },
+    { "email": "bob@grocery.test", "password": "Grocery-Test-2026", "role": "joins with an invite code" }
+  ]
+}

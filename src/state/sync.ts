@@ -1,23 +1,22 @@
 import NetInfo from '@react-native-community/netinfo';
-import { RealtimeChannel } from '@supabase/supabase-js';
+import { collection, doc, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 import { SYNCED_TABLES } from '../domain/types';
 import { getDb } from '../data/db';
-import { supabase } from '../services/supabase';
+import { firestore } from '../services/firebase';
+import { createFirestoreRemote } from '../sync/firestoreRemote';
 import { SyncEngine, SyncState } from '../sync/engine';
-import { createSupabaseRemote } from '../sync/supabaseRemote';
 
 /**
  * Drives the SyncEngine: pushes shortly after local edits, syncs on
- * reconnect, on foreground, every minute, and when Supabase Realtime reports
- * a change in the active household.
+ * reconnect, on foreground, every minute, and whenever Firestore reports a
+ * change in the active household.
  */
 class SyncController {
     engine: SyncEngine | null = null;
     private cleanups: (() => void)[] = [];
     private pushTimer: ReturnType<typeof setTimeout> | null = null;
-    private onMembershipChange: (() => void) | null = null;
 
     init() {
         if (!this.engine) this.engine = new SyncEngine(getDb(), null);
@@ -27,10 +26,10 @@ class SyncController {
     start(userId: string, householdId: string, onMembershipChange: () => void) {
         this.stop();
         const engine = this.init();
-        if (!supabase) return;
-        this.onMembershipChange = onMembershipChange;
-        engine.setRemote(createSupabaseRemote(supabase));
+        if (!firestore) return;
+        const fs = firestore;
         const db = getDb();
+        engine.setRemote(createFirestoreRemote(fs, () => db.householdId));
 
         this.cleanups.push(
             db.subscribe(() => {
@@ -48,17 +47,35 @@ class SyncController {
         const interval = setInterval(() => this.schedule(0), 60_000);
         this.cleanups.push(() => clearInterval(interval));
 
-        const channel: RealtimeChannel = supabase.channel(`household:${householdId}`);
+        // Realtime: watch the newest change in each table and pull when it moves.
+        const warn = (e: Error) => console.warn('Live updates paused:', e.message);
         for (const table of SYNCED_TABLES) {
-            channel.on('postgres_changes', { event: '*', schema: 'public', table, filter: `household_id=eq.${householdId}` }, () =>
-                this.schedule(400),
-            );
+            const latest = query(collection(fs, 'households', householdId, table), orderBy('server_updated_at', 'desc'), limit(1));
+            this.cleanups.push(onSnapshot(latest, { includeMetadataChanges: false }, () => this.schedule(400), warn));
         }
-        channel.on('postgres_changes', { event: '*', schema: 'public', table: 'household_members', filter: `user_id=eq.${userId}` }, () =>
-            this.onMembershipChange?.(),
+        // Role changes, removal, or a rename: refresh the household.
+        let seenMember = false;
+        this.cleanups.push(
+            onSnapshot(
+                doc(fs, 'households', householdId, 'members', userId),
+                () => {
+                    if (seenMember) onMembershipChange();
+                    seenMember = true;
+                },
+                () => onMembershipChange(),
+            ),
         );
-        channel.subscribe();
-        this.cleanups.push(() => void supabase?.removeChannel(channel));
+        let seenHousehold = false;
+        this.cleanups.push(
+            onSnapshot(
+                doc(fs, 'households', householdId),
+                () => {
+                    if (seenHousehold) onMembershipChange();
+                    seenHousehold = true;
+                },
+                warn,
+            ),
+        );
 
         void engine.syncNow();
     }

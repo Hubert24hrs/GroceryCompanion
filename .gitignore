@@ -42,3 +42,5 @@ yarn-error.*
 /android
 
 tsc_output.txt
+# Function parameters (not secrets) must ship with deploys.
+!functions/.env

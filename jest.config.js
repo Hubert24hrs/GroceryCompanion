@@ -7,9 +7,10 @@ module.exports = {
             setupFiles: ['<rootDir>/jest.setup.js'],
         },
         {
-            displayName: 'db',
+            // Firestore security rules; needs the emulator (npm run test:rules).
+            displayName: 'rules',
             testEnvironment: 'node',
-            testMatch: ['<rootDir>/supabase/tests/**/*.test.js'],
+            testMatch: ['<rootDir>/firebase/tests/**/*.test.js'],
             transform: {},
         },
     ],

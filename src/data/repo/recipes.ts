@@ -2,6 +2,7 @@ import { consolidateIngredients, itemsToBuy, NeededIngredient } from '../../doma
 import { autoCategorize } from '../../domain/categories';
 import { parseItem } from '../../domain/parsing';
 import { Ingredient, MealPlanEntry, MealType, Recipe } from '../../domain/types';
+import { unitLabel } from '../../domain/units';
 import { getDb, NewRecord } from '../db';
 import { addItem } from './items';
 
@@ -52,7 +53,7 @@ export function parseIngredientLines(text: string): Ingredient[] {
 
 export function ingredientsToLines(ingredients: Ingredient[]): string {
     return ingredients
-        .map(i => [i.quantity ?? '', i.unit ?? '', i.name, i.note ? `(${i.note})` : ''].filter(Boolean).join(' '))
+        .map(i => [i.quantity ?? '', i.unit ? unitLabel(i.unit, i.quantity) : '', i.name, i.note ? `(${i.note})` : ''].filter(Boolean).join(' '))
         .join('\n');
 }
 

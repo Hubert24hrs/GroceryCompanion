@@ -7,7 +7,7 @@ import { RootScreenProps } from '../navigation/navigation';
 import { relativeTime } from '../domain/dates';
 import { UserPreferences } from '../domain/types';
 import { parseMoney } from '../domain/validation';
-import { isSupabaseConfigured } from '../services/supabase';
+import { isBackendConfigured } from '../services/firebase';
 import { DIETARY_OPTIONS, formatMoney, usePrefs } from '../state/prefs';
 import { useIsPro, useSession } from '../state/session';
 import { syncController, useSyncState } from '../state/sync';
@@ -178,7 +178,7 @@ export function SettingsScreen({ navigation }: RootScreenProps<'Settings'>) {
             <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xxl }]} keyboardShouldPersistTaps="handled">
                 <Section title="Account">
                     <Card style={styles.card}>
-                        {!isSupabaseConfigured ? (
+                        {!isBackendConfigured ? (
                             <Row
                                 icon="phone-portrait-outline"
                                 label="Saved on this device"

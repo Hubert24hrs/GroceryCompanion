@@ -15,10 +15,12 @@ export class PurchaseError extends Error {
 }
 
 const ENTITLEMENT = process.env.EXPO_PUBLIC_REVENUECAT_ENTITLEMENT_ID || 'pro';
-const apiKey = Platform.select({
+const rawKey = Platform.select({
     ios: process.env.EXPO_PUBLIC_REVENUECAT_API_KEY_IOS,
     android: process.env.EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID,
 });
+// Template values like "appl_..." or "your-key" mean "not set up yet".
+const apiKey = rawKey && !/\.\.\.|your[-_.]/i.test(rawKey) ? rawKey : undefined;
 
 let configured = false;
 let packages: PurchasesPackage[] = [];
@@ -28,7 +30,7 @@ const isPro = (info: CustomerInfo) => Boolean(info.entitlements.active[ENTITLEME
 export const purchasesAvailable = Boolean(apiKey);
 export const purchasesUnavailableReason = apiKey ? null : 'Subscriptions are not configured for this build.';
 
-/** Configure RevenueCat and identify the user (Supabase id) so entitlements follow the account. */
+/** Configure RevenueCat and identify the user (Firebase uid) so entitlements follow the account. */
 export async function configurePurchases(userId: string | null): Promise<boolean | null> {
     if (!apiKey) return null;
     try {
