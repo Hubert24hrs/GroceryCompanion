@@ -28,15 +28,18 @@ Synced rows use the same snake_case fields as before. `updated_at` is a
 Firestore Timestamp, and `server_updated_at` is the server commit time that
 clients page their pulls by (`src/sync/firestoreRemote.ts`).
 
-## One-time setup still needed in the console
+## Status
 
-1. **Turn on email sign-in.** Open Authentication → Sign-in method → Email/Password → Enable
-   ([direct link](https://console.firebase.google.com/project/grocery-companion-hub/authentication/providers)).
-   Until you do, sign-up shows "Email sign-in isn't switched on for this app yet."
-   It's a manual step because the only API for it upgrades the project to Identity Platform, which can't be undone.
-2. **Deploy the webhook** (optional, needed only for Pro subscriptions):
-   - Cloud Functions require the Blaze (pay-as-you-go) plan, so first upgrade
-     the project under Usage and billing. Light usage stays within the free allowance.
+- Email/Password sign-in: **enabled** (Authentication → Sign-in method).
+- Firestore rules and indexes: **deployed**.
+- `revenuecatWebhook`: **built and tested, not deployed**. Cloud Functions need the
+  Blaze plan, and both billing accounts on the owner's Google account are closed.
+
+## Remaining setup: deploy the webhook (needed only for Pro subscriptions)
+
+   - Reopen a billing account (or add one) and upgrade the project to Blaze under
+     [Usage and billing](https://console.firebase.google.com/project/grocery-companion-hub/usage/details).
+     Light usage stays within the free allowance.
    - Then run:
      ```bash
      firebase functions:secrets:set REVENUECAT_WEBHOOK_SECRET   # make up a long random string
