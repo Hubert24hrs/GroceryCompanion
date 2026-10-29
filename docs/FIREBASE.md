@@ -32,24 +32,24 @@ clients page their pulls by (`src/sync/firestoreRemote.ts`).
 
 - Email/Password sign-in: **enabled** (Authentication → Sign-in method).
 - Firestore rules and indexes: **deployed**.
-- `revenuecatWebhook`: **built and tested, not deployed**. Cloud Functions need the
-  Blaze plan, and both billing accounts on the owner's Google account are closed.
+- Plan: **Blaze**, billed to the "Suskii Errands" billing account, with a $1 budget alert.
+- `revenuecatWebhook`: **deployed** at
+  `https://europe-west1-grocery-companion-hub.cloudfunctions.net/revenuecatWebhook`.
+  It answers 401 to a wrong secret and 200 to a signed RevenueCat test event.
+  The shared secret is `REVENUECAT_WEBHOOK_SECRET` in Secret Manager.
 
-## Remaining setup: deploy the webhook (needed only for Pro subscriptions)
+## Remaining setup: connect RevenueCat (needed only for Pro subscriptions)
 
-   - Reopen a billing account (or add one) and upgrade the project to Blaze under
-     [Usage and billing](https://console.firebase.google.com/project/grocery-companion-hub/usage/details).
-     Light usage stays within the free allowance.
-   - Then run:
-     ```bash
-     firebase functions:secrets:set REVENUECAT_WEBHOOK_SECRET   # make up a long random string
-     npm run deploy:functions
-     ```
-   - In RevenueCat, go to Project → Integrations → Webhooks and add the function URL
-     (`https://europe-west1-grocery-companion-hub.cloudfunctions.net/revenuecatWebhook`).
-     Set the Authorization header to `Bearer <the same secret>`.
-   - Use entitlement id `pro`, or change `REVENUECAT_ENTITLEMENT_ID` in `functions/.env`
-     and `EXPO_PUBLIC_REVENUECAT_ENTITLEMENT_ID` in the app's `.env`.
+1. Create the RevenueCat project, with the iOS/Android apps, products and an entitlement `pro`.
+   Put its public SDK keys in the app's `.env` (`EXPO_PUBLIC_REVENUECAT_API_KEY_IOS` / `_ANDROID`).
+2. Read the webhook secret: `firebase functions:secrets:access REVENUECAT_WEBHOOK_SECRET`.
+3. In RevenueCat, go to Project → Integrations → Webhooks and add the URL above, with the
+   Authorization header set to `Bearer <that secret>`. Then use **Send test event**; it should succeed.
+4. Using a different entitlement id? Change `REVENUECAT_ENTITLEMENT_ID` in `functions/.env`
+   and `EXPO_PUBLIC_REVENUECAT_ENTITLEMENT_ID` in `.env`, then run `npm run deploy:functions`.
+
+If a deploy fails with "User code failed to load… Timeout", set
+`FUNCTIONS_DISCOVERY_TIMEOUT=120` and deploy again (slow machines can need more than 10 s).
 
 Rules and indexes are already deployed. After changing `firestore.rules`, run
 `npm run deploy:rules`.
