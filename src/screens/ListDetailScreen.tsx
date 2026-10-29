@@ -1,418 +1,288 @@
-import React, { useEffect, useCallback, useState, useRef } from 'react';
-import {
-    View,
-    Text,
-    StyleSheet,
-    ScrollView,
-    TouchableOpacity,
-    SafeAreaView,
-    StatusBar,
-    Alert,
-    Modal,
-} from 'react-native';
-import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../utils/constants';
-import { CATEGORY_CONFIG, ListItem } from '../types';
-import { useListStore, useCurrentList, useItemsByCategory, useUncheckedCount, useCheckedCount } from '../store/useListStore';
-import { QuickAddBar } from '../components/entry/QuickAddBar';
-import { CategorySection } from '../components/list/ItemRow';
-import { PantryList } from '../components/list/PantryList';
-import ConfettiCannon from 'react-native-confetti-cannon';
-import * as Haptics from 'expo-haptics';
-import { BarcodeScanner } from '../components/scanner/BarcodeScanner';
-import { Ionicons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import React, { useLayoutEffect, useMemo, useState } from 'react';
+import { SectionList, StyleSheet, Switch, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { RootScreenProps } from '../navigation/navigation';
+import { addLowStockToList, clearChecked, deleteList, finishTrip, restoreItem, toggleItem, uncheckAll } from '../data/repo';
+import { CATEGORIES, compareCategories } from '../domain/categories';
+import { Category, ListItem } from '../domain/types';
+import { canEdit } from '../domain/validation';
+import { useRecord, useTable } from '../state/hooks';
+import { formatMoney } from '../state/prefs';
+import { useSession } from '../state/session';
+import { toast, toastError } from '../state/toast';
+import { Button, Card, EmptyState, IconButton, ProgressBar, tap, Text } from '../ui/primitives';
+import { layout } from '../ui/Screen';
+import { ActionItem, ActionSheet, ConfirmSheet, Sheet } from '../ui/Sheet';
+import { radius, spacing, useTheme } from '../ui/theme';
+import { EditItemSheet } from './list/EditItemSheet';
+import { ItemRow } from './list/ItemRow';
+import { QuickAddBar } from './list/QuickAddBar';
+import { ListFormSheet } from './lists/ListFormSheet';
 
-import { EditItemModal } from '../components/list/EditItemModal';
-import { AdBanner } from '../components/monetization/AdBanner';
-import { SmartAddModal } from '../components/entry/SmartAddModal';
-import { parseIngredient } from '../utils/parsing';
-
-interface ListDetailScreenProps {
-    navigation: any;
-    route: any;
+interface Section {
+    key: Category | 'cart';
+    title: string;
+    color: string;
+    icon: string;
+    data: ListItem[];
 }
 
-export function ListDetailScreen({ navigation, route }: ListDetailScreenProps) {
+const sumPrices = (items: ListItem[]) => Math.round(items.reduce((s, i) => s + (i.price ?? 0), 0) * 100) / 100;
+
+export function ListDetailScreen({ route, navigation }: RootScreenProps<'ListDetail'>) {
     const { listId } = route.params;
-    const [viewMode, setViewMode] = useState<'shopping' | 'pantry'>('shopping');
-    const [showScanner, setShowScanner] = useState(false);
-    const [showSmartAdd, setShowSmartAdd] = useState(false);
-    const [editingItem, setEditingItem] = useState<ListItem | null>(null);
-    const confettiRef = useRef<any>(null);
+    const { colors } = useTheme();
+    const insets = useSafeAreaInsets();
+    const list = useRecord('lists', listId);
+    const allItems = useTable('items');
+    const editable = canEdit(useSession(s => s.role));
 
-    const currentList = useCurrentList();
-    const itemsByCategory = useItemsByCategory();
-    const uncheckedCount = useUncheckedCount();
-    const checkedCount = useCheckedCount();
+    const [editing, setEditing] = useState<ListItem | null>(null);
+    const [menuOpen, setMenuOpen] = useState(false);
+    const [formOpen, setFormOpen] = useState(false);
+    const [confirmDelete, setConfirmDelete] = useState(false);
+    const [finishing, setFinishing] = useState(false);
+    const [restock, setRestock] = useState(true);
 
-    const { selectList, deleteItem, checkout, addItem, updateItem } = useListStore();
+    const items = useMemo(() => allItems.filter(i => i.listId === listId), [allItems, listId]);
+    const checked = useMemo(
+        () => items.filter(i => i.isChecked).sort((a, b) => (b.checkedAt ?? '').localeCompare(a.checkedAt ?? '')),
+        [items],
+    );
 
-    useEffect(() => {
-        selectList(listId);
-    }, [listId]);
-
-    // Update navigation title and header buttons
-    useEffect(() => {
-        if (currentList) {
-            navigation.setOptions({
-                title: currentList.name,
-                headerStyle: {
-                    backgroundColor: currentList.color,
-                },
-                headerTintColor: COLORS.surface,
-                headerRight: () => (
-                    <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center', marginRight: 8 }}>
-                        <TouchableOpacity
-                            onPress={() => setShowScanner(true)}
-                            style={{ padding: 4 }}
-                        >
-                            <Ionicons name="barcode-outline" size={24} color={COLORS.surface} />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            onPress={() => navigation.navigate('NearbyStores', { listId })}
-                            style={{ padding: 4 }}
-                        >
-                            <Ionicons name="location-outline" size={24} color={COLORS.surface} />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            onPress={() => navigation.navigate('ShareList', { listId })}
-                            style={{ padding: 4 }}
-                        >
-                            <Ionicons name="share-outline" size={24} color={COLORS.surface} />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            onPress={() => setShowSmartAdd(true)}
-                            style={{ padding: 4 }}
-                        >
-                            <Ionicons name="clipboard-outline" size={24} color={COLORS.surface} />
-                        </TouchableOpacity>
-                    </View>
-                ),
-            });
+    const sections = useMemo<Section[]>(() => {
+        const byCategory = new Map<Category, ListItem[]>();
+        for (const i of items) {
+            if (i.isChecked) continue;
+            byCategory.set(i.category, [...(byCategory.get(i.category) ?? []), i]);
         }
-    }, [currentList, navigation, listId]);
+        const result: Section[] = [...byCategory.entries()]
+            .sort(([a], [b]) => compareCategories(a, b))
+            .map(([cat, data]) => ({
+                key: cat,
+                title: CATEGORIES[cat].label,
+                color: CATEGORIES[cat].color,
+                icon: CATEGORIES[cat].icon,
+                data: data.sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+            }));
+        if (checked.length) result.push({ key: 'cart', title: 'In cart', color: colors.primary, icon: 'cart-check', data: checked });
+        return result;
+    }, [items, checked, colors.primary]);
 
-    const handleScan = (data: string) => {
-        setShowScanner(false);
-        // In a real app, we would fetch product details from an API using the barcode
-        // For now, we just add a placeholder item using the barcode as the name
-        // We'll set the category to 'other' by default
-        addItem(`Item ${data}`, 'other');
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    useLayoutEffect(() => {
+        navigation.setOptions({
+            title: list?.name ?? 'List',
+            headerRight: () =>
+                list && editable ? <IconButton icon="ellipsis-horizontal-circle" label="List options" onPress={() => setMenuOpen(true)} color={colors.primary} /> : null,
+        });
+    }, [navigation, list, editable, colors.primary]);
 
-        // Optional: Show a toast or small alert
-        Alert.alert('Item Added', `Added item with barcode: ${data}`);
+    if (!list) {
+        return (
+            <View style={[styles.root, { backgroundColor: colors.background }]}>
+                <EmptyState icon="trash-outline" title="This list is gone" message="It may have been deleted on another device." action="Back to lists" onAction={() => navigation.goBack()} />
+            </View>
+        );
+    }
+
+    const estimated = sumPrices(items);
+    const cartTotal = sumPrices(checked);
+    const remaining = items.length - checked.length;
+
+    const menu: ActionItem[] = [
+        { label: 'Edit details', icon: 'create-outline', onPress: () => setFormOpen(true) },
+        {
+            label: 'Add low-stock pantry items',
+            icon: 'file-tray-stacked-outline',
+            onPress: () =>
+                addLowStockToList(listId).then(
+                    n => toast(n ? `Added ${n} low-stock item${n === 1 ? '' : 's'}.` : 'Nothing in the pantry is running low.', { tone: n ? 'success' : 'info' }),
+                    toastError,
+                ),
+        },
+    ];
+    if (checked.length) {
+        menu.push(
+            { label: 'Uncheck all', icon: 'refresh', onPress: () => void uncheckAll(listId).catch(toastError) },
+            {
+                label: 'Remove checked items',
+                icon: 'remove-circle-outline',
+                onPress: () =>
+                    clearChecked(listId).then(
+                        ids =>
+                            toast(`Removed ${ids.length} item${ids.length === 1 ? '' : 's'}.`, {
+                                actionLabel: 'Undo',
+                                onAction: () => ids.forEach(restoreItem),
+                            }),
+                        toastError,
+                    ),
+            },
+        );
+    }
+    menu.push({ label: 'Delete list', icon: 'trash-outline', destructive: true, onPress: () => setConfirmDelete(true) });
+
+    const finish = async () => {
+        setFinishing(false);
+        try {
+            const s = await finishTrip(listId, { restockPantry: restock });
+            const parts = [`${s.purchased} item${s.purchased === 1 ? '' : 's'} bought`];
+            if (s.spent > 0) parts.push(`${formatMoney(s.spent)} spent`);
+            if (s.restocked > 0) parts.push(`${s.restocked} added to pantry`);
+            toast(`Trip saved: ${parts.join(', ')}.`, { tone: 'success', durationMs: 4000 });
+        } catch (e) {
+            toastError(e);
+        }
     };
 
-    useEffect(() => {
-        if (uncheckedCount === 0 && checkedCount > 0 && viewMode === 'shopping') {
-            confettiRef.current?.start();
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        }
-    }, [uncheckedCount, checkedCount, viewMode]);
-
-    const handleCheckout = useCallback(() => {
-        if (checkedCount === 0) return;
-
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-        Alert.alert(
-            'Checkout Items?',
-            `Move ${checkedCount} checked item${checkedCount !== 1 ? 's' : ''} to your Pantry?`,
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Checkout & Move to Pantry',
-                    style: 'default',
-                    onPress: () => {
-                        checkout();
-                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                        Alert.alert('Success', 'Items moved to Pantry');
-                    },
-                },
-            ]
-        );
-    }, [checkedCount, checkout]);
-
-    const handleItemLongPress = useCallback((item: ListItem) => {
-        Alert.alert(
-            'Item Options',
-            `What would you like to do with "${item.name}"?`,
-            [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Edit Item', onPress: () => setEditingItem(item) },
-                {
-                    text: 'Delete',
-                    style: 'destructive',
-                    onPress: () => deleteItem(item.id)
-                }
-            ]
-        );
-    }, [deleteItem]);
-
-    const handleSaveItemUpdates = useCallback(async (updates: Partial<ListItem>) => {
-        if (editingItem) {
-            await updateItem(editingItem.id, updates);
-            setEditingItem(null);
-        }
-    }, [editingItem, updateItem]);
-
-    const handleSmartAdd = useCallback(async (items: string[]) => {
-        let addedCount = 0;
-        for (const itemText of items) {
-            const parsed = parseIngredient(itemText);
-            if (parsed.name) {
-                await addItem(
-                    parsed.name,
-                    undefined, // Auto-categorize
-                    parsed.quantity,
-                    parsed.unit
-                );
-                addedCount++;
-            }
-        }
-
-        if (addedCount > 0) {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            // confettiRef.current?.start(); // Optional celebration
-        }
-    }, [addItem]);
-
-    // Get categories that have items
-    const categoriesWithItems = Object.entries(itemsByCategory)
-        .filter(([_, items]) => items.length > 0)
-        .sort((a, b) => {
-            const order = Object.keys(CATEGORY_CONFIG);
-            return order.indexOf(a[0]) - order.indexOf(b[0]);
-        });
-
-    // Split into unchecked and checked (logic is handled by viewMode really, but this was in previous code)
-    // Actually, itemsByCategory returns all items. We filter in render if needed, but the list shows all.
-    // The previous code had specific logic for "complete state" which assumes unchecked items present?
-    // Let's keep existing logic.
-
-    // Check if we have ONLY checked items to show "Shopping complete"
-    // We need to know if there are unchecked items.
-    const hasUncheckedItems = uncheckedCount > 0;
-    const hasOnlyCheckedItems = !hasUncheckedItems && checkedCount > 0;
+    const header = (
+        <View style={styles.header}>
+            {editable ? <QuickAddBar listId={listId} /> : (
+                <Card style={{ padding: spacing.md }}>
+                    <Text variant="caption" muted>
+                        You can view this list. Ask the household owner for editor access to make changes.
+                    </Text>
+                </Card>
+            )}
+            <View style={styles.stats}>
+                <Text variant="caption" muted>
+                    {remaining} to get{checked.length ? ` · ${checked.length} in cart` : ''}
+                    {list.storeName ? ` · ${list.storeName}` : ''}
+                </Text>
+                {estimated > 0 ? (
+                    <Text variant="caption" muted>
+                        Est. {formatMoney(estimated)}
+                    </Text>
+                ) : null}
+            </View>
+            {list.budget ? (
+                <View style={{ gap: 6 }}>
+                    <ProgressBar value={estimated / list.budget} color={estimated > list.budget ? colors.danger : list.color} />
+                    <Text variant="caption" color={estimated > list.budget ? colors.danger : colors.textMuted}>
+                        {estimated > list.budget
+                            ? `${formatMoney(estimated - list.budget)} over the ${formatMoney(list.budget)} budget`
+                            : `${formatMoney(list.budget - estimated)} left of ${formatMoney(list.budget)}`}
+                    </Text>
+                </View>
+            ) : null}
+        </View>
+    );
 
     return (
-        <SafeAreaView style={styles.container}>
-            <Modal visible={showScanner} animationType="slide" onRequestClose={() => setShowScanner(false)}>
-                <BarcodeScanner
-                    onScan={handleScan}
-                    onClose={() => setShowScanner(false)}
-                />
-            </Modal>
-
-            <StatusBar barStyle="light-content" backgroundColor={currentList?.color || COLORS.primary} />
-
-            {/* View Toggle */}
-            <View style={styles.toggleContainer}>
-                <TouchableOpacity
-                    style={[styles.toggleButton, viewMode === 'shopping' && styles.toggleButtonActive]}
-                    onPress={() => setViewMode('shopping')}
-                >
-                    <Text style={[styles.toggleText, viewMode === 'shopping' && styles.toggleTextActive]}>Shopping List</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.toggleButton, viewMode === 'pantry' && styles.toggleButtonActive]}
-                    onPress={() => setViewMode('pantry')}
-                >
-                    <Text style={[styles.toggleText, viewMode === 'pantry' && styles.toggleTextActive]}>My Pantry</Text>
-                </TouchableOpacity>
-            </View>
-
-            {viewMode === 'pantry' ? (
-                <PantryList onEditItem={setEditingItem} />
-            ) : (
-                <>
-                    {/* Progress header */}
-                    <View style={styles.progressHeader}>
-                        <View style={styles.progressInfo}>
-                            <Text style={styles.progressText}>
-                                {uncheckedCount} item{uncheckedCount !== 1 ? 's' : ''} remaining
-                            </Text>
-                            {checkedCount > 0 && (
-                                <TouchableOpacity onPress={handleCheckout}>
-                                    <Text style={styles.checkoutText}>Checkout ({checkedCount})</Text>
-                                </TouchableOpacity>
-                            )}
-                        </View>
-
-                        {currentList?.storeName && (
-                            <View style={styles.storeInfo}>
-                                <Text style={styles.storeIcon}>📍</Text>
-                                <Text style={styles.storeName}>{currentList.storeName}</Text>
-                            </View>
-                        )}
-                    </View>
-
-                    {/* Items list */}
-                    <ScrollView
-                        style={styles.scrollView}
-                        contentContainerStyle={styles.scrollContent}
-                        keyboardShouldPersistTaps="handled"
-                    >
-                        {categoriesWithItems.length === 0 ? (
-                            <View style={styles.emptyState}>
-                                <Text style={styles.emptyIcon}>✨</Text>
-                                <Text style={styles.emptyTitle}>List is empty</Text>
-                                <Text style={styles.emptyText}>Add your first item below</Text>
-                            </View>
-                        ) : hasOnlyCheckedItems ? (
-                            <View style={styles.completeState}>
-                                <Text style={styles.completeIcon}>🎉</Text>
-                                <Text style={styles.completeTitle}>Shopping complete!</Text>
-                                <Text style={styles.completeText}>All {checkedCount} items checked off</Text>
-                            </View>
-                        ) : (
-                            categoriesWithItems.map(([category, items]) => (
-                                <CategorySection
-                                    key={category}
-                                    category={category}
-                                    items={items}
-                                    onItemLongPress={handleItemLongPress}
-                                />
-                            ))
-                        )}
-                    </ScrollView>
-
-                    {/* Quick add bar */}
-                    <QuickAddBar />
-                    <ConfettiCannon
-                        ref={confettiRef}
-                        count={200}
-                        origin={{ x: -10, y: 0 }}
-                        autoStart={false}
-                        fadeOut={true}
+        <View style={[styles.root, { backgroundColor: colors.background }]}>
+            <SectionList
+                sections={sections}
+                keyExtractor={i => i.id}
+                stickySectionHeadersEnabled={false}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + (checked.length ? 110 : 40) }]}
+                ListHeaderComponent={header}
+                ListEmptyComponent={
+                    <EmptyState
+                        icon="basket-outline"
+                        title="Nothing on this list"
+                        message={editable ? 'Type a few items above — separate them with commas.' : 'Items your household adds will show up here.'}
                     />
-                </>
-            )}
-
-            <EditItemModal
-                visible={!!editingItem}
-                item={editingItem}
-                onClose={() => setEditingItem(null)}
-                onSave={handleSaveItemUpdates}
+                }
+                renderSectionHeader={({ section }) => (
+                    <View style={[styles.band, { backgroundColor: colors.surfaceAlt, borderLeftColor: section.color }]}>
+                        <MaterialCommunityIcons name={section.icon as never} size={18} color={section.color} />
+                        <Text variant="label" style={{ flex: 1 }}>
+                            {section.title}
+                        </Text>
+                        <Text variant="caption" muted>
+                            {section.data.length}
+                        </Text>
+                    </View>
+                )}
+                renderSectionFooter={() => <View style={{ height: spacing.md }} />}
+                renderItem={({ item, index, section }) => (
+                    <View style={index === section.data.length - 1 ? styles.lastRow : undefined}>
+                        <ItemRow
+                            item={item}
+                            readOnly={!editable}
+                            onToggle={() => {
+                                tap();
+                                toggleItem(item.id);
+                            }}
+                            onEdit={() => setEditing(item)}
+                        />
+                    </View>
+                )}
             />
 
-            <SmartAddModal
-                visible={showSmartAdd}
-                onClose={() => setShowSmartAdd(false)}
-                onAddItems={handleSmartAdd}
+            {editable && checked.length > 0 ? (
+                <View style={[styles.finishBar, { paddingBottom: insets.bottom + spacing.md, backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+                    <View style={layout.page}>
+                        <Button
+                            title={`Finish trip · ${checked.length} item${checked.length === 1 ? '' : 's'}${cartTotal ? ` · ${formatMoney(cartTotal)}` : ''}`}
+                            icon="checkmark-done"
+                            variant="accent"
+                            onPress={() => setFinishing(true)}
+                        />
+                    </View>
+                </View>
+            ) : null}
+
+            <EditItemSheet item={editing} onClose={() => setEditing(null)} />
+            <ActionSheet visible={menuOpen} onClose={() => setMenuOpen(false)} title={list.name} actions={menu} />
+            <ListFormSheet visible={formOpen} onClose={() => setFormOpen(false)} list={list} />
+            <ConfirmSheet
+                visible={confirmDelete}
+                onClose={() => setConfirmDelete(false)}
+                title="Delete list?"
+                message={`“${list.name}” and its ${items.length} item${items.length === 1 ? '' : 's'} will be removed for everyone in your household.`}
+                confirmLabel="Delete"
+                onConfirm={() => {
+                    navigation.goBack();
+                    deleteList(listId).catch(toastError);
+                }}
             />
-            <AdBanner />
-        </SafeAreaView>
+            <Sheet
+                visible={finishing}
+                onClose={() => setFinishing(false)}
+                title="Finish trip"
+                footer={<Button title="Save trip" icon="checkmark-done" variant="accent" onPress={finish} />}
+            >
+                <Text muted>
+                    {checked.length} checked item{checked.length === 1 ? '' : 's'} will leave the list.
+                    {cartTotal > 0 ? ` ${formatMoney(cartTotal)} goes into your spending history.` : ' Add prices to items to track spending.'}
+                </Text>
+                <View style={[styles.toggle, { backgroundColor: colors.surfaceAlt }]}>
+                    <View style={{ flex: 1, gap: 2 }}>
+                        <Text variant="label">Restock pantry</Text>
+                        <Text variant="caption" muted>
+                            Add food items to your pantry so you know what you have.
+                        </Text>
+                    </View>
+                    <Switch value={restock} onValueChange={setRestock} trackColor={{ true: colors.primary, false: colors.border }} />
+                </View>
+                {remaining > 0 ? (
+                    <Text variant="caption" muted>
+                        {remaining} unchecked item{remaining === 1 ? '' : 's'} will stay on the list.
+                    </Text>
+                ) : null}
+            </Sheet>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: COLORS.background,
-    },
-    progressHeader: {
-        backgroundColor: COLORS.surface,
-        paddingHorizontal: SPACING.lg,
-        paddingVertical: SPACING.md,
-        borderBottomWidth: 1,
-        borderBottomColor: COLORS.divider,
-    },
-    progressInfo: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    progressText: {
-        fontSize: FONT_SIZES.md,
-        color: COLORS.text,
-        fontWeight: '500',
-    },
-    checkoutText: {
-        fontSize: FONT_SIZES.sm,
-        color: COLORS.primary,
-        fontWeight: 'bold',
-    },
-    toggleContainer: {
-        flexDirection: 'row',
-        backgroundColor: COLORS.surface,
-        padding: SPACING.sm,
-        borderBottomWidth: 1,
-        borderBottomColor: COLORS.divider,
-    },
-    toggleButton: {
-        flex: 1,
-        paddingVertical: SPACING.sm,
-        alignItems: 'center',
-        borderRadius: BORDER_RADIUS.md,
-    },
-    toggleButtonActive: {
-        backgroundColor: COLORS.background,
-    },
-    toggleText: {
-        fontSize: FONT_SIZES.md,
-        color: COLORS.textSecondary,
-        fontWeight: '600',
-    },
-    toggleTextActive: {
-        color: COLORS.primary,
-    },
-    storeInfo: {
+    root: { flex: 1 },
+    content: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, ...layout.page },
+    header: { gap: spacing.md, marginBottom: spacing.lg },
+    stats: { flexDirection: 'row', justifyContent: 'space-between' },
+    band: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginTop: SPACING.sm,
+        gap: spacing.sm,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        borderLeftWidth: 4,
+        borderTopLeftRadius: radius.sm,
+        borderTopRightRadius: radius.md,
     },
-    storeIcon: {
-        fontSize: 14,
-        marginRight: SPACING.xs,
-    },
-    storeName: {
-        fontSize: FONT_SIZES.sm,
-        color: COLORS.textSecondary,
-    },
-    scrollView: {
-        flex: 1,
-    },
-    scrollContent: {
-        paddingTop: SPACING.md,
-        paddingBottom: SPACING.xxl,
-    },
-    emptyState: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: SPACING.xxl * 2,
-    },
-    emptyIcon: {
-        fontSize: 48,
-        marginBottom: SPACING.md,
-    },
-    emptyTitle: {
-        fontSize: FONT_SIZES.lg,
-        fontWeight: '600',
-        color: COLORS.text,
-        marginBottom: SPACING.xs,
-    },
-    emptyText: {
-        fontSize: FONT_SIZES.md,
-        color: COLORS.textSecondary,
-    },
-    completeState: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: SPACING.xxl * 2,
-    },
-    completeIcon: {
-        fontSize: 64,
-        marginBottom: SPACING.md,
-    },
-    completeTitle: {
-        fontSize: FONT_SIZES.xl,
-        fontWeight: '600',
-        color: COLORS.primary,
-        marginBottom: SPACING.xs,
-    },
-    completeText: {
-        fontSize: FONT_SIZES.md,
-        color: COLORS.textSecondary,
-    },
+    lastRow: { borderBottomLeftRadius: radius.md, borderBottomRightRadius: radius.md, overflow: 'hidden' },
+    finishBar: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: spacing.lg, paddingTop: spacing.md, borderTopWidth: StyleSheet.hairlineWidth },
+    toggle: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderRadius: radius.md },
 });

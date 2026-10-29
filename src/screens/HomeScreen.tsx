@@ -1,426 +1,233 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import {
-    View,
-    Text,
-    StyleSheet,
-    FlatList,
-    TouchableOpacity,
-    TextInput,
-    Modal,
-    SafeAreaView,
-    StatusBar,
-    ActivityIndicator,
-    Alert,
-} from 'react-native';
-import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS, LIST_COLORS } from '../utils/constants';
-import { useListStore, useLists, useIsLoading } from '../store/useListStore';
-import { useUserStore } from '../store/useUserStore';
-import { ListCard } from '../components/list/ListCard';
-import { AdBanner } from '../components/monetization/AdBanner';
-import { Button } from '../components/common/Button';
-import { initDatabase } from '../services/database/sqlite';
-import { ShoppingList } from '../types';
+import { Ionicons } from '@expo/vector-icons';
+import React, { useMemo, useState } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { TabScreenProps } from '../navigation/navigation';
+import { insights, purchasesInMonth, totalSpent } from '../domain/analytics';
+import { canCreateList, FREE_LIMITS } from '../domain/entitlements';
+import { formatDay, monthKey, relativeTime, today } from '../domain/dates';
+import { expiryStatus, isLowStock } from '../domain/pantry';
+import { canEdit } from '../domain/validation';
+import { useTable } from '../state/hooks';
+import { formatMoney, usePrefs } from '../state/prefs';
+import { useIsPro, useSession } from '../state/session';
+import { useSyncState } from '../state/sync';
+import { toast } from '../state/toast';
+import { Banner, Card, IconButton, IconName, ProgressBar, SectionTitle, Text } from '../ui/primitives';
+import { TabScreen } from '../ui/Screen';
+import { radius, spacing, useTheme } from '../ui/theme';
+import { countItems, ListCard } from './lists/ListCard';
+import { MEAL_LABEL, MEAL_ORDER } from './mealplan/mealUi';
+import { ListFormSheet } from './lists/ListFormSheet';
 
-interface HomeScreenProps {
-    navigation: any;
+function greeting(): string {
+    const h = new Date().getHours();
+    return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
 }
 
-export function HomeScreen({ navigation }: HomeScreenProps) {
-    const [isDbReady, setIsDbReady] = useState(false);
-    const [showCreateModal, setShowCreateModal] = useState(false);
-    const [editingList, setEditingList] = useState<ShoppingList | null>(null);
-    const [newListName, setNewListName] = useState('');
-    const [newListBudget, setNewListBudget] = useState('');
-    const [selectedColor, setSelectedColor] = useState(LIST_COLORS[0]);
+function SyncPill() {
+    const { colors } = useTheme();
+    const user = useSession(s => s.user);
+    const sync = useSyncState();
+    let icon: IconName = 'phone-portrait-outline';
+    let label = 'On this device';
+    if (user) {
+        if (sync.status === 'syncing') [icon, label] = ['sync', 'Syncing…'];
+        else if (sync.status === 'offline') [icon, label] = ['cloud-offline-outline', sync.pending ? `Offline · ${sync.pending} waiting` : 'Offline'];
+        else if (sync.status === 'error' || sync.failed.length) [icon, label] = ['warning-outline', 'Sync problem'];
+        else if (sync.pending) [icon, label] = ['cloud-upload-outline', `${sync.pending} to sync`];
+        else [icon, label] = ['cloud-done-outline', sync.lastSyncedAt ? `Synced ${relativeTime(sync.lastSyncedAt)}` : 'Synced'];
+    }
+    return (
+        <View style={[styles.pill, { backgroundColor: colors.surfaceAlt }]} accessibilityLabel={`Sync status: ${label}`}>
+            <Ionicons name={icon} size={14} color={colors.textMuted} />
+            <Text variant="caption" muted>
+                {label}
+            </Text>
+        </View>
+    );
+}
 
-    const lists = useLists();
-    const isLoading = useIsLoading();
-    const { loadLists, createList, updateList, deleteList, loadRecentItems } = useListStore();
-    const { user } = useUserStore();
+function StatTile({ icon, tint, value, label, onPress }: { icon: IconName; tint: string; value: string; label: string; onPress: () => void }) {
+    const { colors } = useTheme();
+    return (
+        <Card onPress={onPress} style={styles.tile} accessibilityLabel={`${value} ${label}`}>
+            <View style={[styles.tileIcon, { backgroundColor: tint + '22' }]}>
+                <Ionicons name={icon} size={18} color={tint} />
+            </View>
+            <Text variant="heading">{value}</Text>
+            <Text variant="caption" muted>
+                {label}
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} style={styles.tileChevron} />
+        </Card>
+    );
+}
 
-    // Initialize database and load data
-    useEffect(() => {
-        async function init() {
-            try {
-                await initDatabase();
-                setIsDbReady(true);
-                await loadLists();
-                await loadRecentItems();
-            } catch (error) {
-                console.error('Failed to initialize database:', error);
-            }
+export function HomeScreen({ navigation }: TabScreenProps<'Home'>) {
+    const { colors } = useTheme();
+    const householdName = useSession(s => s.householdName);
+    const storageWarning = useSession(s => s.storageWarning);
+    const editable = canEdit(useSession(s => s.role));
+    const isPro = useIsPro();
+    const budget = usePrefs(s => s.prefs.monthlyBudget);
+    const lists = useTable('lists');
+    const items = useTable('items');
+    const pantry = useTable('pantry_items');
+    const meals = useTable('meal_plan_entries');
+    const recipes = useTable('recipes');
+    const purchases = useTable('purchases');
+    const [formOpen, setFormOpen] = useState(false);
+
+    const day = today();
+    const activeLists = useMemo(
+        () => lists.filter(l => !l.isArchived && !l.isTemplate).sort((a, b) => a.sortOrder - b.sortOrder),
+        [lists],
+    );
+    const counts = useMemo(() => countItems(items), [items]);
+
+    const pantryAlerts = useMemo(() => {
+        let expiring = 0;
+        let low = 0;
+        for (const p of pantry) {
+            const s = expiryStatus(p, day);
+            if (s === 'expired' || s === 'soon') expiring++;
+            if (isLowStock(p)) low++;
         }
-        init();
+        return { expiring, low };
+    }, [pantry, day]);
 
+    const todaysMeals = useMemo(() => {
+        const byId = new Map(recipes.map(r => [r.id, r]));
+        return meals
+            .filter(m => m.date === day)
+            .sort((a, b) => MEAL_ORDER[a.mealType] - MEAL_ORDER[b.mealType])
+            .map(m => ({ id: m.id, type: m.mealType, title: (m.recipeId && byId.get(m.recipeId)?.title) || m.title || 'Untitled meal' }));
+    }, [meals, recipes, day]);
 
-    }, []);
+    const month = monthKey(day);
+    const spent = useMemo(() => totalSpent(purchasesInMonth(purchases, month)), [purchases, month]);
+    const tip = useMemo(() => insights(purchases, month, budget, n => formatMoney(n))[0], [purchases, month, budget]);
 
-    const handleCreatePress = () => {
-        if (!user?.isPro && lists.length >= 3) {
-            navigation.navigate('Paywall');
+    const newList = () => {
+        if (!canCreateList(isPro, activeLists.length)) {
+            toast(`The free plan includes ${FREE_LIMITS.activeLists} active lists.`, { tone: 'warning', actionLabel: 'See Pro', onAction: () => navigation.navigate('Pro') });
             return;
         }
-        setEditingList(null);
-        setNewListName('');
-        setNewListBudget('');
-        setSelectedColor(LIST_COLORS[0]);
-        setShowCreateModal(true);
+        setFormOpen(true);
     };
-
-    const handleEditList = (list: ShoppingList) => {
-        setEditingList(list);
-        setNewListName(list.name);
-        setNewListBudget(list.budget ? list.budget.toString() : '');
-        setSelectedColor(list.color);
-        setShowCreateModal(true);
-    };
-
-    const handleSaveList = useCallback(async () => {
-        if (!newListName.trim()) return;
-
-        const budget = newListBudget.trim() ? parseFloat(newListBudget) : undefined;
-
-        if (editingList) {
-            await updateList(editingList.id, {
-                name: newListName.trim(),
-                color: selectedColor,
-                budget
-            });
-            setShowCreateModal(false);
-        } else {
-            const newList = await createList(newListName.trim(), selectedColor, budget);
-            setShowCreateModal(false);
-            // Navigate to the new list
-            navigation.navigate('ListDetail', { listId: newList.id });
-        }
-
-        setNewListName('');
-        setNewListBudget('');
-        setSelectedColor(LIST_COLORS[0]);
-        setEditingList(null);
-    }, [newListName, newListBudget, selectedColor, editingList, createList, updateList, navigation]);
-
-    const handleDeleteList = async () => {
-        if (!editingList) return;
-
-        Alert.alert(
-            'Delete List',
-            `Are you sure you want to delete "${editingList.name}"?`,
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Delete',
-                    style: 'destructive',
-                    onPress: async () => {
-                        await deleteList(editingList.id);
-                        setShowCreateModal(false);
-                    }
-                }
-            ]
-        );
-    };
-
-    const handleListPress = useCallback((list: ShoppingList) => {
-        navigation.navigate('ListDetail', { listId: list.id });
-    }, [navigation]);
-
-    if (!isDbReady) {
-        return (
-            <SafeAreaView style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={COLORS.primary} />
-                <Text style={styles.loadingText}>Loading...</Text>
-            </SafeAreaView>
-        );
-    }
 
     return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
+        <TabScreen title={householdName} subtitle={greeting()} right={
+                <>
+                    <Pressable onPress={() => navigation.navigate('Settings')} accessibilityRole="button" accessibilityHint="Opens settings">
+                        <SyncPill />
+                    </Pressable>
+                    <IconButton icon="settings-outline" label="Settings" onPress={() => navigation.navigate('Settings')} filled />
+                </>
+            }
+        >
+            {storageWarning ? <Banner tone="danger" message={storageWarning} /> : null}
 
-            {/* Header */}
-            <View style={styles.header}>
-                <View style={styles.headerRow}>
-                    <View>
-                        <Text style={styles.title}>Grocery Companion</Text>
-                        <Text style={styles.subtitle}>Your shopping lists</Text>
+            <View>
+                <SectionTitle title="Your lists" action={activeLists.length ? 'See all' : undefined} onAction={() => navigation.navigate('Lists')} />
+                {activeLists.length ? (
+                    <View style={{ gap: spacing.sm }}>
+                        {activeLists.slice(0, 3).map(l => (
+                            <ListCard key={l.id} list={l} counts={counts.get(l.id)} onPress={() => navigation.navigate('ListDetail', { listId: l.id })} />
+                        ))}
                     </View>
-                    <TouchableOpacity
-                        onPress={() => navigation.navigate('Settings')}
-                        style={styles.settingsButton}
-                    >
-                        <Text style={styles.settingsIcon}>⚙️</Text>
-                    </TouchableOpacity>
-                    {!user?.isPro && (
-                        <TouchableOpacity
-                            onPress={() => navigation.navigate('Paywall')}
-                            style={[styles.settingsButton, { marginLeft: 8 }]}
-                        >
-                            <Text style={styles.settingsIcon}>👑</Text>
-                        </TouchableOpacity>
-                    )}
-                </View>
+                ) : (
+                    <Card onPress={editable ? newList : undefined} style={styles.cta}>
+                        <View style={[styles.ctaIcon, { backgroundColor: colors.primary }]}>
+                            <Ionicons name="add" size={24} color={colors.onPrimary} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <Text variant="subheading">Start your first list</Text>
+                            <Text variant="caption" muted>
+                                Items sort themselves by aisle as you add them.
+                            </Text>
+                        </View>
+                    </Card>
+                )}
             </View>
 
-            {/* Lists */}
-            {lists.length === 0 ? (
-                <View style={styles.emptyState}>
-                    <Text style={styles.emptyIcon}>🛒</Text>
-                    <Text style={styles.emptyTitle}>No lists yet</Text>
-                    <Text style={styles.emptyText}>Create your first shopping list to get started</Text>
-                    <Button
-                        title="Create List"
-                        onPress={() => setShowCreateModal(true)}
-                        style={{ marginTop: SPACING.lg }}
-                    />
-                </View>
-            ) : (
-                <FlatList
-                    data={lists}
-                    keyExtractor={(item) => item.id}
-                    contentContainerStyle={styles.listContainer}
-                    renderItem={({ item }) => (
-                        <ListCard
-                            list={item}
-                            onPress={() => handleListPress(item)}
-                            onLongPress={() => handleEditList(item)}
-                        />
-                    )}
-                    refreshing={isLoading}
-                    onRefresh={loadLists}
+            <View style={styles.tiles}>
+                <StatTile
+                    icon="time-outline"
+                    tint={pantryAlerts.expiring ? colors.accent : colors.primary}
+                    value={String(pantryAlerts.expiring)}
+                    label={pantryAlerts.expiring === 1 ? 'item expiring' : 'items expiring'}
+                    onPress={() => navigation.navigate('Pantry', { filter: 'attention' })}
                 />
-            )}
+                <StatTile
+                    icon="trending-down"
+                    tint={pantryAlerts.low ? colors.warning : colors.primary}
+                    value={String(pantryAlerts.low)}
+                    label="running low"
+                    onPress={() => navigation.navigate('Pantry', { filter: 'attention' })}
+                />
+            </View>
 
-            {/* FAB */}
-            {lists.length > 0 && (
-                <TouchableOpacity
-                    style={styles.fab}
-                    onPress={handleCreatePress}
-                    activeOpacity={0.8}
-                >
-                    <Text style={styles.fabIcon}>+</Text>
-                </TouchableOpacity>
-            )}
+            <View>
+                <SectionTitle title="Today" action="Meal plan" onAction={() => navigation.navigate('MealPlan')} />
+                <Card style={{ gap: spacing.md }}>
+                    <Text variant="caption" muted>
+                        {formatDay(day)}
+                    </Text>
+                    {todaysMeals.length ? (
+                        todaysMeals.map(m => (
+                            <View key={m.id} style={styles.meal}>
+                                <Text variant="label" muted style={{ width: 82 }}>
+                                    {MEAL_LABEL[m.type]}
+                                </Text>
+                                <Text style={{ flex: 1 }} numberOfLines={1}>
+                                    {m.title}
+                                </Text>
+                            </View>
+                        ))
+                    ) : (
+                        <Text muted>Nothing planned yet. Pick a recipe and its ingredients can go straight onto a list.</Text>
+                    )}
+                </Card>
+            </View>
 
-            {/* Create List Modal */}
-            <Modal
-                visible={showCreateModal}
-                animationType="slide"
-                transparent
-                onRequestClose={() => setShowCreateModal(false)}
-            >
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>{editingList ? 'Edit List' : 'New List'}</Text>
-
-                        <TextInput
-                            style={styles.modalInput}
-                            placeholder="List name"
-                            placeholderTextColor={COLORS.textLight}
-                            value={newListName}
-                            onChangeText={setNewListName}
-                            autoFocus
-                        />
-
-                        <TextInput
-                            style={styles.modalInput}
-                            placeholder="Budget (optional)"
-                            placeholderTextColor={COLORS.textLight}
-                            value={newListBudget}
-                            onChangeText={setNewListBudget}
-                            keyboardType="numeric"
-                        />
-
-                        <Text style={styles.colorLabel}>Pick a color</Text>
-                        <View style={styles.colorPicker}>
-                            {LIST_COLORS.map((color) => (
-                                <TouchableOpacity
-                                    key={color}
-                                    style={[
-                                        styles.colorOption,
-                                        { backgroundColor: color },
-                                        selectedColor === color && styles.colorSelected,
-                                    ]}
-                                    onPress={() => setSelectedColor(color)}
-                                />
-                            ))}
-                        </View>
-
-                        <View style={styles.modalButtons}>
-                            {editingList && (
-                                <Button
-                                    title="Delete"
-                                    variant="outline"
-                                    onPress={handleDeleteList}
-                                    style={{ flex: 1, borderColor: COLORS.destructive }}
-                                    textStyle={{ color: COLORS.destructive }}
-                                />
-                            )}
-                            <Button
-                                title="Cancel"
-                                variant="ghost"
-                                onPress={() => setShowCreateModal(false)}
-                                style={{ flex: 1 }}
-                            />
-                            <Button
-                                title={editingList ? 'Save' : 'Create'}
-                                onPress={handleSaveList}
-                                disabled={!newListName.trim()}
-                                style={{ flex: 1 }}
-                            />
-                        </View>
+            <View>
+                <SectionTitle title="Spending this month" />
+                <Card style={{ gap: spacing.sm }}>
+                    <View style={styles.spendRow}>
+                        <Text variant="title" style={{ fontSize: 26 }}>
+                            {formatMoney(spent)}
+                        </Text>
+                        {budget ? (
+                            <Text variant="caption" muted>
+                                of {formatMoney(budget)}
+                            </Text>
+                        ) : null}
                     </View>
-                </View>
-            </Modal>
-            <AdBanner />
-        </SafeAreaView>
+                    {budget ? <ProgressBar value={spent / budget} color={spent > budget ? colors.danger : colors.primary} /> : null}
+                    <Text variant="caption" muted>
+                        {tip ?? (spent > 0 ? 'Based on the trips you finished this month.' : 'Finish a shopping trip with prices to start tracking spending.')}
+                    </Text>
+                </Card>
+            </View>
+
+            <ListFormSheet
+                visible={formOpen}
+                onClose={() => setFormOpen(false)}
+                onSaved={l => navigation.navigate('ListDetail', { listId: l.id })}
+            />
+        </TabScreen>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: COLORS.background,
-    },
-    loadingContainer: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: COLORS.background,
-    },
-    loadingText: {
-        marginTop: SPACING.md,
-        fontSize: FONT_SIZES.md,
-        color: COLORS.textSecondary,
-    },
-    header: {
-        paddingHorizontal: SPACING.lg,
-        paddingTop: SPACING.xl,
-        paddingBottom: SPACING.lg,
-    },
-    headerRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    settingsButton: {
-        padding: SPACING.sm,
-        backgroundColor: COLORS.surface,
-        borderRadius: BORDER_RADIUS.full,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
-    },
-    settingsIcon: {
-        fontSize: 20,
-    },
-    title: {
-        fontSize: FONT_SIZES.xxxl,
-        fontWeight: 'bold',
-        color: COLORS.text,
-    },
-    subtitle: {
-        fontSize: FONT_SIZES.md,
-        color: COLORS.textSecondary,
-        marginTop: SPACING.xs,
-    },
-    listContainer: {
-        paddingHorizontal: SPACING.lg,
-        paddingBottom: 100,
-    },
-    emptyState: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingHorizontal: SPACING.xl,
-    },
-    emptyIcon: {
-        fontSize: 64,
-        marginBottom: SPACING.lg,
-    },
-    emptyTitle: {
-        fontSize: FONT_SIZES.xl,
-        fontWeight: '600',
-        color: COLORS.text,
-        marginBottom: SPACING.sm,
-    },
-    emptyText: {
-        fontSize: FONT_SIZES.md,
-        color: COLORS.textSecondary,
-        textAlign: 'center',
-    },
-    fab: {
-        position: 'absolute',
-        right: SPACING.lg,
-        bottom: SPACING.xl,
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        backgroundColor: COLORS.primary,
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 6,
-        elevation: 8,
-    },
-    fabIcon: {
-        fontSize: 32,
-        color: COLORS.surface,
-        marginTop: -2,
-    },
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        justifyContent: 'flex-end',
-    },
-    modalContent: {
-        backgroundColor: COLORS.surface,
-        borderTopLeftRadius: BORDER_RADIUS.xl,
-        borderTopRightRadius: BORDER_RADIUS.xl,
-        padding: SPACING.lg,
-        paddingBottom: SPACING.xxl,
-    },
-    modalTitle: {
-        fontSize: FONT_SIZES.xl,
-        fontWeight: '600',
-        color: COLORS.text,
-        marginBottom: SPACING.lg,
-        textAlign: 'center',
-    },
-    modalInput: {
-        backgroundColor: COLORS.background,
-        borderRadius: BORDER_RADIUS.lg,
-        paddingHorizontal: SPACING.md,
-        height: 50,
-        fontSize: FONT_SIZES.md,
-        color: COLORS.text,
-        marginBottom: SPACING.lg,
-    },
-    colorLabel: {
-        fontSize: FONT_SIZES.sm,
-        color: COLORS.textSecondary,
-        marginBottom: SPACING.sm,
-    },
-    colorPicker: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: SPACING.sm,
-        marginBottom: SPACING.lg,
-    },
-    colorOption: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-    },
-    colorSelected: {
-        borderWidth: 3,
-        borderColor: COLORS.text,
-    },
-    modalButtons: {
-        flexDirection: 'row',
-        gap: SPACING.md,
-    },
+    pill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: radius.pill, },
+    tiles: { flexDirection: 'row', gap: spacing.md },
+    tile: { flex: 1, gap: 2 },
+    tileIcon: { width: 32, height: 32, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.xs },
+    tileChevron: { position: 'absolute', top: spacing.lg, right: spacing.md },
+    cta: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+    ctaIcon: { width: 42, height: 42, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+    meal: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    spendRow: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm },
 });

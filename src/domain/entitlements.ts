@@ -1,0 +1,46 @@
+// Free vs Pro. The UI gates on these; the server independently enforces the
+// household member limit in `accept_invite`.
+
+export const FREE_LIMITS = {
+    activeLists: 3,
+    householdMembers: 3,
+    recipes: 25,
+    analyticsMonths: 1,
+} as const;
+
+export type ProFeature =
+    | 'unlimitedLists'
+    | 'unlimitedMembers'
+    | 'unlimitedRecipes'
+    | 'listTemplates'
+    | 'fullAnalytics'
+    | 'priceInsights'
+    | 'smartSuggestions'
+    | 'adFree';
+
+export const PRO_FEATURES: { feature: ProFeature; title: string; detail: string; icon: string }[] = [
+    { feature: 'unlimitedLists', title: 'Unlimited lists', detail: `Free includes ${FREE_LIMITS.activeLists} active lists`, icon: 'list' },
+    { feature: 'unlimitedMembers', title: 'Bigger households', detail: `Share with more than ${FREE_LIMITS.householdMembers} people`, icon: 'people' },
+    { feature: 'unlimitedRecipes', title: 'Unlimited recipe box', detail: `Free holds ${FREE_LIMITS.recipes} recipes`, icon: 'book' },
+    { feature: 'listTemplates', title: 'Reusable list templates', detail: 'Weekly staples in one tap', icon: 'copy' },
+    { feature: 'smartSuggestions', title: 'Smart meal ideas', detail: 'Ranked by pantry, expiry, diet and budget', icon: 'sparkles' },
+    { feature: 'fullAnalytics', title: 'Full spending history', detail: 'Trends, categories and savings insights', icon: 'stats-chart' },
+    { feature: 'priceInsights', title: 'Price tracking', detail: 'See where each item was cheapest', icon: 'pricetags' },
+    { feature: 'adFree', title: 'No ads', detail: 'A calmer shopping experience', icon: 'ban' },
+];
+
+export function hasFeature(isPro: boolean, _feature: ProFeature): boolean {
+    return isPro;
+}
+
+export function canCreateList(isPro: boolean, activeListCount: number): boolean {
+    return isPro || activeListCount < FREE_LIMITS.activeLists;
+}
+
+export function canAddRecipe(isPro: boolean, recipeCount: number): boolean {
+    return isPro || recipeCount < FREE_LIMITS.recipes;
+}
+
+export function canAddMember(isPro: boolean, memberCount: number): boolean {
+    return isPro || memberCount < FREE_LIMITS.householdMembers;
+}
