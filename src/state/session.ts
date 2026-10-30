@@ -136,7 +136,16 @@ export const useSession = create<SessionState>((set, get) => {
         await pro;
     }
 
-    async function resetToLocal() {
+    // Sign-out (and account deletion) reset the device both directly and via the
+    // auth listener; run one reset at a time or two interleave and leave a second,
+    // orphaned copy of the starter data whose uploads can never succeed.
+    let resetting: Promise<void> | null = null;
+    function resetToLocal(): Promise<void> {
+        if (!resetting) resetting = doResetToLocal().finally(() => (resetting = null));
+        return resetting;
+    }
+
+    async function doResetToLocal() {
         syncController.stop();
         const db = getDb();
         await db.clearAll();
@@ -150,6 +159,50 @@ export const useSession = create<SessionState>((set, get) => {
         seedStarterRecipes(db);
         await db.flush();
         set({ user: null, linked: false, memberships: [], members: [], role: 'owner', householdName: 'My Household', accountPro: false });
+    }
+
+    async function refresh() {
+        const { user, linked } = get();
+        if (!isBackendConfigured || !user || !linked) return;
+        const db = getDb();
+        const memberships = await backend.myMemberships(user.id);
+
+        // Forget data from households we no longer belong to.
+        const ids = new Set(memberships.map(m => m.household.id));
+        const localHouseholds = new Set(SYNCED_TABLES.flatMap(t => db.all(t).map(r => r.householdId)));
+        for (const hid of localHouseholds) if (!ids.has(hid) && hid !== db.householdId) await db.removeHouseholdData(hid);
+
+        if (!memberships.length) {
+            // Our only household was deleted by its owner: start a fresh one of our own.
+            await db.removeHouseholdData(db.householdId);
+            const own = await backend.ownHousehold(user);
+            await db.setMeta(META.activeHouseholdId, own);
+            db.setHousehold(own, user.id);
+            syncController.start(user.id, own, () => void get().refreshHousehold());
+            return refresh();
+        }
+
+        let active = memberships.find(m => m.household.id === db.householdId);
+        if (!active && memberships.length) {
+            // Removed from the active household: switch to another one.
+            await db.removeHouseholdData(db.householdId);
+            active = memberships.find(m => m.role === 'owner') ?? memberships[0];
+            await db.setMeta(META.activeHouseholdId, active.household.id);
+            db.setHousehold(active.household.id, user.id);
+            syncController.start(user.id, active.household.id, () => void get().refreshHousehold());
+        }
+
+        const [members, accountPro] = await Promise.all([
+            active ? backend.loadMembers(db.householdId) : Promise.resolve([]),
+            backend.loadAccountPro(user.id).catch(() => false),
+        ]);
+        set({
+            memberships,
+            role: active?.role ?? 'owner',
+            householdName: active?.household.name ?? 'My Household',
+            members,
+            accountPro,
+        });
     }
 
     function requireUser() {
@@ -250,47 +303,12 @@ export const useSession = create<SessionState>((set, get) => {
         },
 
         refreshHousehold: async () => {
-            const { user, linked } = get();
-            if (!isBackendConfigured || !user || !linked) return;
-            const db = getDb();
-            const memberships = await backend.myMemberships(user.id);
-
-            // Forget data from households we no longer belong to.
-            const ids = new Set(memberships.map(m => m.household.id));
-            const localHouseholds = new Set(SYNCED_TABLES.flatMap(t => db.all(t).map(r => r.householdId)));
-            for (const hid of localHouseholds) if (!ids.has(hid) && hid !== db.householdId) await db.removeHouseholdData(hid);
-
-            if (!memberships.length) {
-                // Our only household was deleted by its owner: start a fresh one of our own.
-                await db.removeHouseholdData(db.householdId);
-                const own = await backend.ownHousehold(user);
-                await db.setMeta(META.activeHouseholdId, own);
-                db.setHousehold(own, user.id);
-                syncController.start(user.id, own, () => void get().refreshHousehold());
-                return get().refreshHousehold();
+            try {
+                await refresh();
+            } catch (e) {
+                // Background refreshes run offline too; the next one will catch up.
+                console.warn('Household refresh failed:', (e as Error).message);
             }
-
-            let active = memberships.find(m => m.household.id === db.householdId);
-            if (!active && memberships.length) {
-                // Removed from the active household: switch to another one.
-                await db.removeHouseholdData(db.householdId);
-                active = memberships.find(m => m.role === 'owner') ?? memberships[0];
-                await db.setMeta(META.activeHouseholdId, active.household.id);
-                db.setHousehold(active.household.id, user.id);
-                syncController.start(user.id, active.household.id, () => void get().refreshHousehold());
-            }
-
-            const [members, accountPro] = await Promise.all([
-                active ? backend.loadMembers(db.householdId) : Promise.resolve([]),
-                backend.loadAccountPro(user.id).catch(() => false),
-            ]);
-            set({
-                memberships,
-                role: active?.role ?? 'owner',
-                householdName: active?.household.name ?? 'My Household',
-                members,
-                accountPro,
-            });
         },
 
         switchHousehold: async householdId => {

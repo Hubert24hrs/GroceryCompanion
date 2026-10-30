@@ -3,10 +3,13 @@ import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 're
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootScreenProps } from '../navigation/navigation';
 import { createRecipe, ingredientsToLines, parseIngredientLines, updateRecipe } from '../data/repo';
+import { getDb } from '../data/db';
 import { CATEGORIES } from '../domain/categories';
+import { canAddRecipe, FREE_LIMITS } from '../domain/entitlements';
 import { formatQuantity } from '../domain/units';
-import { cleanText, parseMoney, parseOptionalNumber, validateName, validateUrl } from '../domain/validation';
+import { cleanText, hostOf, parseMoney, parseOptionalNumber, validateName, validateUrl } from '../domain/validation';
 import { useRecord, useTable } from '../state/hooks';
+import { useIsPro } from '../state/session';
 import { toast } from '../state/toast';
 import { Button, Card, Chip, Field, Text } from '../ui/primitives';
 import { layout } from '../ui/Screen';
@@ -21,6 +24,7 @@ export function RecipeEditScreen({ route, navigation }: RootScreenProps<'RecipeE
     const insets = useSafeAreaInsets();
     const existing = useRecord('recipes', route.params.recipeId);
     const recipes = useTable('recipes');
+    const isPro = useIsPro();
 
     // Initialised once from the recipe being edited; later remote edits don't clobber typing.
     const [title, setTitle] = useState(existing?.title ?? '');
@@ -88,9 +92,14 @@ export function RecipeEditScreen({ route, navigation }: RootScreenProps<'RecipeE
             updateRecipe(existing.id, fields);
             navigation.goBack();
         } else {
+            // The free recipe limit, checked against live data at save time.
+            if (!canAddRecipe(isPro, getDb().list('recipes').length)) {
+                toast(`The free recipe box holds ${FREE_LIMITS.recipes} recipes.`, { tone: 'warning', actionLabel: 'See Pro', onAction: () => navigation.navigate('Pro') });
+                return;
+            }
             const created = createRecipe({
                 ...fields,
-                sourceName: src.value ? new URL(src.value).hostname.replace(/^www\./, '') : null,
+                sourceName: src.value ? hostOf(src.value) : null,
                 isFavorite: false,
             });
             navigation.replace('RecipeDetail', { recipeId: created.id });

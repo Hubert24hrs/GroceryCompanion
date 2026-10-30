@@ -161,47 +161,47 @@ export function HomeScreen({ navigation }: TabScreenProps<'Home'>) {
             ) : null}
 
             {isPro ? (
-            <View style={styles.tiles}>
-                <StatTile
-                    icon="time-outline"
-                    tint={pantryAlerts.expiring ? colors.accent : colors.primary}
-                    value={String(pantryAlerts.expiring)}
-                    label={pantryAlerts.expiring === 1 ? 'item expiring' : 'items expiring'}
-                    onPress={() => navigation.navigate('Pantry', { filter: 'attention' })}
-                />
-                <StatTile
-                    icon="trending-down"
-                    tint={pantryAlerts.low ? colors.warning : colors.primary}
-                    value={String(pantryAlerts.low)}
-                    label="running low"
-                    onPress={() => navigation.navigate('Pantry', { filter: 'attention' })}
-                />
-            </View>
+                <View style={styles.tiles}>
+                    <StatTile
+                        icon="time-outline"
+                        tint={pantryAlerts.expiring ? colors.accent : colors.primary}
+                        value={String(pantryAlerts.expiring)}
+                        label={pantryAlerts.expiring === 1 ? 'item expiring' : 'items expiring'}
+                        onPress={() => navigation.navigate('Pantry', { filter: 'attention' })}
+                    />
+                    <StatTile
+                        icon="trending-down"
+                        tint={pantryAlerts.low ? colors.warning : colors.primary}
+                        value={String(pantryAlerts.low)}
+                        label="running low"
+                        onPress={() => navigation.navigate('Pantry', { filter: 'attention' })}
+                    />
+                </View>
             ) : null}
 
             {isPro ? (
-            <View>
-                <SectionTitle title="Today" action="Meal plan" onAction={() => navigation.navigate('MealPlan')} />
-                <Card style={{ gap: spacing.md }}>
-                    <Text variant="caption" muted>
-                        {formatDay(day)}
-                    </Text>
-                    {todaysMeals.length ? (
-                        todaysMeals.map(m => (
-                            <View key={m.id} style={styles.meal}>
-                                <Text variant="label" muted style={{ width: 82 }}>
-                                    {MEAL_LABEL[m.type]}
-                                </Text>
-                                <Text style={{ flex: 1 }} numberOfLines={1}>
-                                    {m.title}
-                                </Text>
-                            </View>
-                        ))
-                    ) : (
-                        <Text muted>Nothing planned yet. Pick a recipe and its ingredients can go straight onto a list.</Text>
-                    )}
-                </Card>
-            </View>
+                <View>
+                    <SectionTitle title="Today" action="Meal plan" onAction={() => navigation.navigate('MealPlan')} />
+                    <Card style={{ gap: spacing.md }}>
+                        <Text variant="caption" muted>
+                            {formatDay(day)}
+                        </Text>
+                        {todaysMeals.length ? (
+                            todaysMeals.map(m => (
+                                <View key={m.id} style={styles.meal}>
+                                    <Text variant="label" muted style={{ width: 82 }}>
+                                        {MEAL_LABEL[m.type]}
+                                    </Text>
+                                    <Text style={{ flex: 1 }} numberOfLines={1}>
+                                        {m.title}
+                                    </Text>
+                                </View>
+                            ))
+                        ) : (
+                            <Text muted>Nothing planned yet. Pick a recipe and its ingredients can go straight onto a list.</Text>
+                        )}
+                    </Card>
+                </View>
             ) : null}
 
             <View>

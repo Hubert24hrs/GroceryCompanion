@@ -1,9 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { getDb } from '../../data/db';
 import { createList, updateList } from '../../data/repo';
+import { canCreateList, FREE_LIMITS } from '../../domain/entitlements';
 import { ShoppingList } from '../../domain/types';
 import { cleanText, parseMoney, validateName } from '../../domain/validation';
+import { useIsPro } from '../../state/session';
+import { toast } from '../../state/toast';
 import { Button, Field, Text } from '../../ui/primitives';
 import { Sheet } from '../../ui/Sheet';
 import { spacing } from '../../ui/theme';
@@ -22,6 +26,7 @@ export function ListFormSheet({ visible, onClose, list, onSaved }: {
     const [budget, setBudget] = useState('');
     const [color, setColor] = useState(LIST_COLORS[0]);
     const [errors, setErrors] = useState<{ name?: string; budget?: string }>({});
+    const isPro = useIsPro();
 
     useEffect(() => {
         if (!visible) return;
@@ -44,6 +49,14 @@ export function ListFormSheet({ visible, onClose, list, onSaved }: {
             updateList(list.id, { name: n.value, color, storeName, budget: b.value });
             onSaved?.({ ...list, name: n.value, color, storeName, budget: b.value });
         } else {
+            // Re-check the free limit against live data: a screen hidden behind
+            // another can open this sheet with a stale list count.
+            const activeLists = getDb().list('lists').filter(l => !l.isArchived && !l.isTemplate).length;
+            if (!canCreateList(isPro, activeLists)) {
+                onClose();
+                toast(`The free plan includes ${FREE_LIMITS.activeLists} active lists.`, { tone: 'warning' });
+                return;
+            }
             onSaved?.(createList({ name: n.value, color, storeName, budget: b.value }));
         }
         onClose();

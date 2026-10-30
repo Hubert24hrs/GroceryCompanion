@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { addIngredientsToList, createList, previewIngredients } from '../../data/repo';
 import { NeededIngredient, PlannedRecipe } from '../../domain/aggregate';
@@ -63,9 +63,13 @@ export function AddToListSheet({ visible, onClose, planned, onAdded }: {
         [visible, planned, listId, items, pantry],
     );
 
+    // Default ticks when the sheet opens or the target list changes. Not on every
+    // pantry/list update while open, or a sync would undo the user's choices.
+    const latestLines = useRef(lines);
+    latestLines.current = lines;
     useEffect(() => {
-        if (visible) setSelected(new Set(lines.filter(l => l.status === 'needed' || l.status === 'partial').map(l => l.key)));
-    }, [visible, lines]);
+        if (visible) setSelected(new Set(latestLines.current.filter(l => l.status === 'needed' || l.status === 'partial').map(l => l.key)));
+    }, [visible, listId, planned]);
 
     const toggle = (key: string) =>
         setSelected(prev => {

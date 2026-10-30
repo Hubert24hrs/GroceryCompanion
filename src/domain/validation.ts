@@ -53,6 +53,15 @@ export function normalizeInviteCode(value: string): Result<string> {
     return ok(code);
 }
 
+/**
+ * "https://www.bbcgoodfood.com/recipes/x" → "bbcgoodfood.com". Parsed by hand:
+ * React Native's built-in URL class doesn't implement `hostname`.
+ */
+export function hostOf(url: string): string | null {
+    const host = url.match(/^[a-z][a-z0-9+.-]*:\/\/(?:[^@/?#]*@)?([^/:?#]+)/i)?.[1];
+    return host ? host.toLowerCase().replace(/^www\./, '') : null;
+}
+
 export function validateUrl(value: string): Result<string | null> {
     const text = value.trim();
     if (!text) return ok(null);

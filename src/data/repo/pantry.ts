@@ -1,5 +1,5 @@
 import { autoCategorize } from '../../domain/categories';
-import { defaultPantryLocation, findPantryMatch, isLowStock } from '../../domain/pantry';
+import { defaultPantryLocation, findPantryMatch, isLowStock, itemKey } from '../../domain/pantry';
 import { displayName } from '../../domain/parsing';
 import { Category, PantryItem, PantryLocation } from '../../domain/types';
 import { convert, roundQuantity } from '../../domain/units';
@@ -73,12 +73,11 @@ export function restorePantryItem(id: string): void {
 export function addLowStockToList(listId: string): Promise<number> {
     const db = getDb();
     return db.transaction(() => {
-        const listKeys = new Set(
-            db.list('items').filter(i => i.listId === listId && !i.isChecked).map(i => i.name.toLowerCase()),
-        );
+        // Same product matching as everywhere else ("Bananas" = "banana").
+        const listKeys = new Set(db.list('items').filter(i => i.listId === listId && !i.isChecked).map(i => itemKey(i.name)));
         let added = 0;
         for (const p of db.list('pantry_items')) {
-            if (!isLowStock(p) || listKeys.has(p.name.toLowerCase())) continue;
+            if (!isLowStock(p) || listKeys.has(itemKey(p.name))) continue;
             addItem(listId, { name: p.name, category: p.category, unit: p.unit, quantity: p.lowStockThreshold ?? null });
             added++;
         }

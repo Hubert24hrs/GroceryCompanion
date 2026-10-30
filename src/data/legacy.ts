@@ -1,4 +1,6 @@
 import { autoCategorize, isCategory } from '../domain/categories';
+import { isValidISODate } from '../domain/dates';
+import { defaultPantryLocation, itemKey } from '../domain/pantry';
 import { normalizeUnit } from '../domain/units';
 import { Category } from '../domain/types';
 import { LocalDatabase } from './db';
@@ -76,7 +78,7 @@ export function importLegacy(
                         unit,
                         lowStockThreshold: null,
                         expiresOn: null,
-                        location: cat === 'frozen' ? 'freezer' : cat === 'dairy' || cat === 'meat' || cat === 'seafood' ? 'fridge' : 'pantry',
+                        location: defaultPantryLocation(cat),
                         barcode: null,
                         notes: str(row.notes),
                     });
@@ -121,7 +123,8 @@ export function importLegacy(
                 const name = str(row.name);
                 if (!name) continue;
                 db.putLocal('recent_items', {
-                    id: name.toLowerCase(),
+                    // Keyed like every other recent item, so v1 entries merge with new ones.
+                    id: itemKey(name),
                     name,
                     category: category(row.category, name),
                     unit: null,
@@ -134,9 +137,11 @@ export function importLegacy(
         for (const meal of mealPlan?.meals ?? []) {
             const recipeId = meal.recipeId ? seedIds.get(meal.recipeId) : undefined;
             const type = meal.type;
-            if (!meal.date || !recipeId || !['breakfast', 'lunch', 'dinner', 'snack'].includes(type ?? '')) continue;
+            // v1 stored full ISO timestamps; the planner keys days as YYYY-MM-DD.
+            const date = typeof meal.date === 'string' ? meal.date.slice(0, 10) : '';
+            if (!isValidISODate(date) || !recipeId || !['breakfast', 'lunch', 'dinner', 'snack'].includes(type ?? '')) continue;
             db.insert('meal_plan_entries', {
-                date: meal.date,
+                date,
                 mealType: type as 'breakfast',
                 recipeId,
                 title: null,
