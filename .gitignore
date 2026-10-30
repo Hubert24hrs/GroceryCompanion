@@ -44,3 +44,7 @@ yarn-error.*
 tsc_output.txt
 # Function parameters (not secrets) must ship with deploys.
 !functions/.env
+
+# Firebase CLI deploy cache and emulator logs
+.firebase/
+*-debug.log
