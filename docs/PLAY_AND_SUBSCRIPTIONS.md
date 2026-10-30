@@ -50,27 +50,27 @@ Your account is a licence tester, so test purchases aren't charged.
 Still to do: enrol in the 15% service fee, and finish bank verification (statement upload) in
 Payments profile, or payouts stay on hold.
 
-## 4. Set up RevenueCat
+## 4. RevenueCat
 
-1. Create an account at revenuecat.com and a project; add a Google Play app with the package
-   name above.
-2. Link Play with a service-account JSON key, following RevenueCat's guide.
-3. Create an **entitlement** with identifier `pro`. The app and the webhook both expect
-   exactly this.
-4. Import the two products and attach them to the `pro` entitlement.
-5. In the **current** offering, add a Monthly and an Annual package. The app labels plans by
-   package type, so use those two types.
-6. **Integrations → Webhooks:**
-   - URL: `https://europe-west1-grocery-companion-hub.cloudfunctions.net/revenuecatWebhook`
-   - Authorization header: `Bearer <secret>`, from
-     `firebase functions:secrets:access REVENUECAT_WEBHOOK_SECRET`
-7. Copy the public Android key (starts `goog_`) and give it to Claude.
+Done, in project **GroceryCompanion** (`46fddbbc`): Google Play app, entitlement `pro`, products
+`pro:monthly` and `pro:annual` attached to it, offering `default` with `$rc_monthly` and
+`$rc_annual`, and the public Android key stored in EAS's production environment.
+
+Still needs you, because both are secrets:
+
+1. **Webhook** (Integrations → Webhooks → Create new webhook). URL:
+   `https://europe-west1-grocery-companion-hub.cloudfunctions.net/revenuecatWebhook`.
+   Authorization header value is `Bearer <secret>`. This copies it to the clipboard unseen:
+   `(printf 'Bearer '; npx firebase functions:secrets:access REVENUECAT_WEBHOOK_SECRET) | tr -d '\r\n' | clip`
+2. **Google Play credentials** (Apps → GroceryCompanion (Play Store) → Service Account
+   Credentials JSON). If you kept the JSON key from DoseAlert, the same one works, because it's
+   the same Play developer account. Otherwise follow RevenueCat's "Google Play service
+   credentials" guide. New keys can take up to 36 hours to start working.
 
 ## 5. Rebuild and test a purchase (Claude can do most of this)
 
-1. Add the key to EAS and rebuild:
-   `npx eas-cli env:create production --name EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID --value <key> --visibility plaintext --scope project`
-   then `npx eas-cli build --platform android --profile production`.
+1. Rebuild with `npx eas-cli build --platform android --profile production`. The key is
+   already in EAS.
 2. Upload the new `.aab` to the same testing track.
 3. Opt in through the testing link above, install from Play (not by USB: billing only works
    for an app installed from Play), and buy Monthly. Test renewals are fast.
