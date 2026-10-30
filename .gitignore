@@ -49,3 +49,4 @@ tsc_output.txt
 .firebase/
 *-debug.log
 release/
+store/feature-graphic-raw.png
