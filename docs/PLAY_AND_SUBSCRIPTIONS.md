@@ -3,7 +3,9 @@
 The steps that need your own accounts or decisions, in order. Everything else is done.
 Play app ID 4975141314886525836, package `com.hubert24hrs.grocerycompanion`.
 
-## 1. Finish the Play setup forms
+## 1. Play setup forms (done)
+
+All saved, and closed testing is unlocked.
 
 | Task | Where | Status |
 |---|---|---|
@@ -14,17 +16,13 @@ Play app ID 4975141314886525836, package `com.hubert24hrs.grocerycompanion`.
 | Store listing text and graphics | Store listings | Saved; icon and feature graphic labelled as AI-made |
 | Category (Food & drink) | Store settings | Saved |
 | Contact details | Store settings | Saved |
-| Content rating | App content | Email and category filled in; you accept IARC's terms, answers below |
+| Content rating | App content | Saved: Everyone, PEGI 3, USK all ages, Brazil 14+ |
 
 **Sign-in details must change before Pro goes on sale.** It's **No** today because no sign-in
 is required and Pro can't be bought in this build. Play needs login details for a Pro account
 (or it rejects the "Yes" answer), so when a build with RevenueCat keys is submitted, create a
 reviewer account in the app, ask Claude to grant it Pro, and change this to **Yes** with those
 details.
-
-**Content rating:** category "All other app types". Violence, sexual content, bad language,
-drugs and gambling: No. Users can exchange content: Yes, only with household members they
-invite. Shares location: No. Digital purchases: Yes.
 
 ## 2. Upload the bundle
 
