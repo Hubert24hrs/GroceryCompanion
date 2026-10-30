@@ -8,6 +8,7 @@ household sharing, backed by Firebase:
 | **Firebase Auth** (email + password) | Accounts. The session persists in AsyncStorage (iOS/Android) or IndexedDB (web). |
 | **Cloud Firestore** | Household data, members, invites, preferences. |
 | **`firestore.rules`** | All permissions: roles, invite checks, the free-plan member limit, last-writer-wins. No server code is needed for any of it. |
+| **Hosting** (`hosting/`) | https://grocery-companion-hub.web.app. `/delete-account` is the web page for account deletion requests (Google Play asks for this link in Data safety). It signs the user in and calls `deleteAccount`. Deploy with `firebase deploy --only hosting`. |
 | **Cloud Functions** (`functions/`) | `revenuecatWebhook` records Pro subscriptions. `deleteAccount` (callable) does in-app account deletion as the stores require: it deletes owned households and all their data and invites, removes the user from other households, deletes preferences and the subscription record, and deletes the sign-in account. It only runs if the user re-entered their password in the last 5 minutes. |
 
 Project: **`grocery-companion-hub`** ([console](https://console.firebase.google.com/project/grocery-companion-hub/overview)).
