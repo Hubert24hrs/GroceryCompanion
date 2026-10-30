@@ -8,29 +8,28 @@ Play app ID 4975141314886525836, package `com.hubert24hrs.grocerycompanion`.
 | Task | Where | Status |
 |---|---|---|
 | Privacy policy, ads, advertising ID, government, financial, health | App content | Saved |
+| Sign-in details | App content | Saved: **No** (see below) |
+| Target audience | App content | Saved: 18 and over |
+| Data safety | App content | Saved |
+| Store listing text and graphics | Store listings | Saved; icon and feature graphic labelled as AI-made |
 | Category (Food & drink) | Store settings | Saved |
-| Data safety | App content | Draft: submit after target audience |
-| Store listing text and graphics | Store listings | Draft: choose the AI declaration, then Save |
 | Contact email | Store settings → Store Listing contact details | Needs your email (public) |
 | Content rating | App content | Needs your email; answers below |
-| Sign-in details | App content | Answer **Yes**: subscriptions count as restricted |
-| Target audience | App content | Unlocks after sign-in details; 18 and over |
 
-**AI declaration (store listing, Review step):** the icon and feature graphic were drawn by
-Claude with a script. The screenshots are real app screens. Choose the option you're
-comfortable stating.
+**Sign-in details must change before Pro goes on sale.** It's **No** today because no sign-in
+is required and Pro can't be bought in this build. Play needs login details for a Pro account
+(or it rejects the "Yes" answer), so when a build with RevenueCat keys is submitted, create a
+reviewer account in the app, ask Claude to grant it Pro, and change this to **Yes** with those
+details.
 
 **Content rating:** category "All other app types". Violence, sexual content, bad language,
 drugs and gambling: No. Users can exchange content: Yes, only with household members they
 invite. Shares location: No. Digital purchases: Yes.
 
-**Sign-in details:** either give reviewers an account with Pro (create it in the app, then
-ask Claude to grant Pro), or explain that accounts are optional and Pro can't be bought
-in this version yet.
-
 ## 2. Upload the bundle
 
-`release/GroceryCompanion-1.0.0-4.aab` is 75 MB, too big for Claude's upload tool.
+`release/GroceryCompanion-1.0.0-4.aab` is 75 MB, and Claude can't upload it: the upload tool stops
+at 10 MB, and Play Console's security rules block loading it from this PC. Drag it in yourself.
 
 - Now: **Test and release → Testing → Internal testing → Create new release**. No setup
   forms needed, and this unlocks subscription products.
@@ -39,6 +38,8 @@ in this version yet.
 - Choose **Use Google-generated key** for Play app signing if asked.
 
 ## 3. Create the subscription in Play
+
+Locked until a bundle is uploaded. Claude can fill this in once step 2 is done.
 
 **Monetise with Play → Products → Subscriptions → Create subscription**
 
