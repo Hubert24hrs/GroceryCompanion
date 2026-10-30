@@ -4,7 +4,7 @@
 GroceryCompanion
 
 ## Short description (80 max)
-Shared grocery lists that sort by aisle, plus your pantry, recipes and meal plan.
+Shared grocery lists that sort by aisle, plus pantry, recipes and meal plans.
 
 ## Full description (4000 max)
 GroceryCompanion keeps your household's shopping, pantry and cooking in one calm place.
