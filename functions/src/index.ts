@@ -2,7 +2,8 @@ import { initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { defineSecret, defineString } from 'firebase-functions/params';
 import { logger } from 'firebase-functions/v2';
-import { onRequest } from 'firebase-functions/v2/https';
+import { HttpsError, onCall, onRequest } from 'firebase-functions/v2/https';
+import { deleteAccountData, isRecentLogin } from './deleteAccount';
 import { planUpdates, RevenueCatEvent, secretMatches, SubscriptionUpdate } from './revenuecat';
 
 initializeApp();
@@ -70,5 +71,26 @@ export const revenuecatWebhook = onRequest({ region: 'europe-west1', secrets: [W
         // 5xx makes RevenueCat retry later.
         logger.error('RevenueCat event failed', { id: event.id, error: (e as Error).message });
         res.status(500).send('Temporary failure');
+    }
+});
+
+/**
+ * In-app account deletion (required by Google Play and the App Store).
+ * The app re-authenticates first; we only accept a sign-in from the last
+ * few minutes so a stolen, long-lived session can't wipe an account.
+ */
+export const deleteAccount = onCall({ region: 'europe-west1', maxInstances: 5 }, async request => {
+    const uid = request.auth?.uid;
+    if (!uid) throw new HttpsError('unauthenticated', 'Sign in to delete your account.');
+    if (!isRecentLogin(request.auth?.token.auth_time, Date.now())) {
+        throw new HttpsError('failed-precondition', 'Please enter your password again to confirm.');
+    }
+    try {
+        const summary = await deleteAccountData(db, uid);
+        logger.info('Account deleted', { uid, ...summary });
+        return { ok: true, ...summary };
+    } catch (e) {
+        logger.error('Account deletion failed', { uid, error: (e as Error).message });
+        throw new HttpsError('internal', 'Your account could not be deleted. Please try again.');
     }
 });

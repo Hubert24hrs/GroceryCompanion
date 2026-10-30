@@ -1,7 +1,9 @@
 import NetInfo from '@react-native-community/netinfo';
 import {
     createUserWithEmailAndPassword,
+    EmailAuthProvider,
     onAuthStateChanged,
+    reauthenticateWithCredential,
     sendPasswordResetEmail,
     signInWithEmailAndPassword,
     signOut as firebaseSignOut,
@@ -14,7 +16,8 @@ import { META, openLocalDatabase, seedStarterRecipes } from '../data/bootstrap';
 import { getDb } from '../data/db';
 import { createAdapter } from '../data/storage/createAdapter';
 import { MemoryAdapter } from '../data/storage/memoryAdapter';
-import { auth, isBackendConfigured } from '../services/firebase';
+import { httpsCallable } from 'firebase/functions';
+import { auth, functions, isBackendConfigured } from '../services/firebase';
 import * as backend from '../services/household';
 import { configurePurchases, onProStatusChange } from '../services/purchases';
 import { usePrefs } from './prefs';
@@ -51,6 +54,10 @@ interface SessionState {
     setMemberRole: (userId: string, role: 'editor' | 'viewer') => Promise<void>;
     removeMember: (userId: string) => Promise<void>;
     leaveHousehold: () => Promise<void>;
+    /** Permanently delete the account and its data (password re-check first). */
+    deleteAccount: (password: string) => Promise<void>;
+    /** Signed out: wipe everything stored on this device. */
+    deleteLocalData: () => Promise<void>;
     setStorePro: (pro: boolean | null) => void;
 }
 
@@ -253,6 +260,16 @@ export const useSession = create<SessionState>((set, get) => {
             const localHouseholds = new Set(SYNCED_TABLES.flatMap(t => db.all(t).map(r => r.householdId)));
             for (const hid of localHouseholds) if (!ids.has(hid) && hid !== db.householdId) await db.removeHouseholdData(hid);
 
+            if (!memberships.length) {
+                // Our only household was deleted by its owner: start a fresh one of our own.
+                await db.removeHouseholdData(db.householdId);
+                const own = await backend.ownHousehold(user);
+                await db.setMeta(META.activeHouseholdId, own);
+                db.setHousehold(own, user.id);
+                syncController.start(user.id, own, () => void get().refreshHousehold());
+                return get().refreshHousehold();
+            }
+
             let active = memberships.find(m => m.household.id === db.householdId);
             if (!active && memberships.length) {
                 // Removed from the active household: switch to another one.
@@ -315,6 +332,34 @@ export const useSession = create<SessionState>((set, get) => {
             const hid = await backend.ownHousehold(user);
             await get().switchHousehold(hid);
             await db.removeHouseholdData(leaving);
+        },
+
+        deleteAccount: async password => {
+            const a = requireAuth();
+            const current = a.currentUser;
+            if (!current?.email || !functions) throw new Error('Sign in first.');
+            try {
+                await reauthenticateWithCredential(current, EmailAuthProvider.credential(current.email, password));
+            } catch (e) {
+                throw authError(e);
+            }
+            syncController.stop();
+            try {
+                await httpsCallable(functions, 'deleteAccount')();
+            } catch (e) {
+                syncController.start(current.uid, getDb().householdId, () => void get().refreshHousehold());
+                throw new Error((e as Error).message || 'Your account could not be deleted. Please try again.');
+            }
+            // The account no longer exists; sign out locally and wipe this device's copy.
+            await firebaseSignOut(a).catch(() => undefined);
+            await resetToLocal();
+            await usePrefs.getState().reset();
+            set({ storePro: await configurePurchases(null) });
+        },
+
+        deleteLocalData: async () => {
+            await resetToLocal();
+            await usePrefs.getState().reset();
         },
 
         setStorePro: pro => set({ storePro: pro }),

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
+import { isRecentLogin } from '../deleteAccount';
 import { planUpdates, RevenueCatEvent, secretMatches } from '../revenuecat';
 
 const NOW = Date.UTC(2026, 9, 29);
@@ -66,5 +67,14 @@ describe('secretMatches', () => {
         assert.equal(secretMatches('s3cret', 's3cret'), false);
         assert.equal(secretMatches(undefined, 's3cret'), false);
         assert.equal(secretMatches('Bearer ', ''), false);
+    });
+});
+
+describe('isRecentLogin', () => {
+    test('accepts a sign-in from the last five minutes only', () => {
+        const now = Date.UTC(2026, 9, 30, 12);
+        assert.equal(isRecentLogin(now / 1000 - 60, now), true);
+        assert.equal(isRecentLogin(now / 1000 - 6 * 60, now), false);
+        assert.equal(isRecentLogin(undefined, now), false);
     });
 });

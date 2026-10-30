@@ -17,6 +17,7 @@ import { layout } from '../ui/Screen';
 import { ConfirmSheet } from '../ui/Sheet';
 import { radius, spacing, useTheme } from '../ui/theme';
 import { AuthMode, AuthSheet } from './settings/AuthSheet';
+import { DeleteAccountSheet } from './settings/DeleteAccountSheet';
 
 const THEMES: { key: UserPreferences['theme']; label: string; icon: IconName }[] = [
     { key: 'system', label: 'Automatic', icon: 'phone-portrait-outline' },
@@ -149,6 +150,7 @@ export function SettingsScreen({ navigation }: RootScreenProps<'Settings'>) {
     const isPro = useIsPro();
     const [auth, setAuth] = useState<AuthMode | null>(null);
     const [confirmSignOut, setConfirmSignOut] = useState(false);
+    const [deleteOpen, setDeleteOpen] = useState(false);
     const [budget, setBudget] = useState(prefs.monthlyBudget != null ? String(prefs.monthlyBudget) : '');
     const [budgetError, setBudgetError] = useState<string | null>(null);
 
@@ -312,8 +314,20 @@ export function SettingsScreen({ navigation }: RootScreenProps<'Settings'>) {
                 <Text variant="caption" muted style={{ textAlign: 'center' }}>
                     GroceryCompanion {appConfig.expo.version}
                 </Text>
+
+                {/* Last item on purpose: the stores require in-app account deletion. */}
+                <Card style={styles.card}>
+                    <Row
+                        icon="trash-outline"
+                        tint={colors.danger}
+                        label={user ? 'Delete account' : 'Delete data on this device'}
+                        detail={user ? 'Permanently delete your account and its data' : 'Remove all lists, pantry, recipes and plans from this device'}
+                        onPress={() => setDeleteOpen(true)}
+                    />
+                </Card>
             </ScrollView>
 
+            <DeleteAccountSheet visible={deleteOpen} onClose={() => setDeleteOpen(false)} />
             <AuthSheet mode={auth} onClose={() => setAuth(null)} />
             <ConfirmSheet
                 visible={confirmSignOut}

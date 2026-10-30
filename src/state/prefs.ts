@@ -23,6 +23,8 @@ interface PrefsState {
     update: (patch: Partial<UserPreferences>) => Promise<void>;
     /** Merge preferences stored on the account (signed-in users). */
     pullFromProfile: (userId: string) => Promise<void>;
+    /** Back to defaults (used when the user deletes their data). */
+    reset: () => Promise<void>;
 }
 
 export const usePrefs = create<PrefsState>((set, get) => ({
@@ -46,6 +48,11 @@ export const usePrefs = create<PrefsState>((set, get) => ({
         if (isBackendConfigured && userId) {
             await saveProfile(userId, prefs).catch(e => console.warn('Could not save preferences to your account:', (e as Error).message));
         }
+    },
+
+    reset: async () => {
+        set({ prefs: { ...DEFAULT_PREFS, currency: deviceCurrency() } });
+        await getDb().setMeta(META.prefs, null);
     },
 
     pullFromProfile: async userId => {

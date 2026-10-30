@@ -1,6 +1,7 @@
 import { FirebaseApp, initializeApp } from 'firebase/app';
 import { Auth, connectAuthEmulator } from 'firebase/auth';
 import { connectFirestoreEmulator, Firestore, initializeFirestore } from 'firebase/firestore';
+import { connectFunctionsEmulator, Functions, getFunctions } from 'firebase/functions';
 import { Platform } from 'react-native';
 import { createAuth } from './firebaseAuth';
 
@@ -28,6 +29,7 @@ export const usingEmulators = process.env.EXPO_PUBLIC_FIREBASE_EMULATORS === '1'
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
 let firestore: Firestore | null = null;
+let functions: Functions | null = null;
 
 if (isBackendConfigured) {
     app = initializeApp(config);
@@ -37,12 +39,15 @@ if (isBackendConfigured) {
         // React Native's networking can't hold Firestore's WebChannel stream open; long polling works everywhere.
         experimentalAutoDetectLongPolling: true,
     });
+    // Same region the functions are deployed to (functions/src/index.ts).
+    functions = getFunctions(app, 'europe-west1');
     if (usingEmulators) {
         // The Android emulator reaches the host machine at 10.0.2.2.
         const host = Platform.OS === 'android' ? '10.0.2.2' : '127.0.0.1';
         connectAuthEmulator(auth, `http://${host}:9099`, { disableWarnings: true });
         connectFirestoreEmulator(firestore, host, 8080);
+        connectFunctionsEmulator(functions, host, 5001);
     }
 }
 
-export { auth, firestore };
+export { auth, firestore, functions };
