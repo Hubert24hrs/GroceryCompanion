@@ -26,7 +26,8 @@ details.
 
 ## 2. Internal testing (done)
 
-Release 4 (1.0.0) is live on the internal track, with the Owner tester list.
+Release 5 (1.0.0), which includes the RevenueCat key, is live on the internal track, with the
+Owner tester list.
 Opt-in link: https://play.google.com/apps/internaltest/4700202274636462994
 
 Later, for **Closed testing**, add at least 12 testers. They must stay opted in for 14 days
@@ -67,12 +68,12 @@ Still needs you, because both are secrets:
    the same Play developer account. Otherwise follow RevenueCat's "Google Play service
    credentials" guide. New keys can take up to 36 hours to start working.
 
-## 5. Rebuild and test a purchase (Claude can do most of this)
+## 5. Test a purchase
 
-1. Rebuild with `npx eas-cli build --platform android --profile production`. The key is
-   already in EAS.
-2. Upload the new `.aab` to the same testing track.
-3. Opt in through the testing link above, install from Play (not by USB: billing only works
+Build 5 is already on the internal track, so no rebuild is needed for this test.
+
+1. Finish both secret steps in section 4.
+2. Opt in through the testing link above, install from Play (not by USB: billing only works
    for an app installed from Play), and buy Monthly. Test renewals are fast.
 
 **Passes when:** the Pro screen shows the Play prices; the purchase unlocks Pro; the webhook
