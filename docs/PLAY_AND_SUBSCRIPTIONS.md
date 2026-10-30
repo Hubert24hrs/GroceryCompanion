@@ -24,32 +24,30 @@ is required and Pro can't be bought in this build. Play needs login details for 
 reviewer account in the app, ask Claude to grant it Pro, and change this to **Yes** with those
 details.
 
-## 2. Upload the bundle
+## 2. Internal testing (done)
 
-`release/GroceryCompanion-1.0.0-4.aab` is 75 MB, and Claude can't upload it: the upload tool stops
-at 10 MB, and Play Console's security rules block loading it from this PC. Drag it in yourself.
+Release 4 (1.0.0) is live on the internal track, with the Owner tester list.
+Opt-in link: https://play.google.com/apps/internaltest/4700202274636462994
 
-- Now: **Test and release → Testing → Internal testing → Create new release**. No setup
-  forms needed, and this unlocks subscription products.
-- After step 1: the same under **Closed testing**, then add at least 12 testers. They must
-  stay opted in for 14 days before you can apply for production.
-- Choose **Use Google-generated key** for Play app signing if asked.
+Later, for **Closed testing**, add at least 12 testers. They must stay opted in for 14 days
+before you can apply for production.
 
-## 3. Create the subscription in Play
+The bundle is too big for Claude's 10 MB upload limit in one piece. To upload one again, split
+it into 9 MB parts, send them into a temporary file input on the release page, rejoin them
+into a File, check the SHA-256, and assign that to the page's `.aab` input.
 
-Locked until a bundle is uploaded. Claude can fill this in once step 2 is done.
+## 3. Subscription in Play (done)
 
-**Monetise with Play → Products → Subscriptions → Create subscription**
+Product `pro` (GroceryCompanion Pro), both base plans active in 175 countries:
 
-| Field | Value |
-|---|---|
-| Product ID | `pro` |
-| Base plan 1 | ID `monthly`, auto-renewing, every month, $5.99 |
-| Base plan 2 | ID `annual`, auto-renewing, every year, $60 |
+| Base plan | Billing | Price |
+|---|---|---|
+| `monthly` | Auto-renewing, monthly | $5.99 |
+| `annual` | Auto-renewing, yearly | $59.99 (Play rounds $60 to this; it can be edited) |
 
-Activate both base plans. Play converts the prices for other countries.
+Your account is a licence tester, so test purchases aren't charged.
 
-Also enrol in the 15% service fee, and finish bank verification (statement upload) in
+Still to do: enrol in the 15% service fee, and finish bank verification (statement upload) in
 Payments profile, or payouts stay on hold.
 
 ## 4. Set up RevenueCat
@@ -74,10 +72,8 @@ Payments profile, or payouts stay on hold.
    `npx eas-cli env:create production --name EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID --value <key> --visibility plaintext --scope project`
    then `npx eas-cli build --platform android --profile production`.
 2. Upload the new `.aab` to the same testing track.
-3. In Play Console: **Settings → License testing**, add your Google account. Testers aren't
-   charged, and test renewals are fast.
-4. Opt in through the testing link, install from Play (not by USB: billing only works for an
-   app installed from Play), and buy Monthly.
+3. Opt in through the testing link above, install from Play (not by USB: billing only works
+   for an app installed from Play), and buy Monthly. Test renewals are fast.
 
 **Passes when:** the Pro screen shows the Play prices; the purchase unlocks Pro; the webhook
 writes `subscriptions/{uid}`; a second device on the same account shows Pro; cancelling or
