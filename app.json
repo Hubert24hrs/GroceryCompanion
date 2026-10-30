@@ -56,7 +56,8 @@
           "cameraPermission": "Allow GroceryCompanion to access your camera."
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-localization"
     ],
     "extra": {
       "eas": {

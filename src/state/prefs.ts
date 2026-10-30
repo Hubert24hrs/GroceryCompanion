@@ -4,12 +4,13 @@ import { META } from '../data/bootstrap';
 import { getDb } from '../data/db';
 import { isBackendConfigured } from '../services/firebase';
 import { loadProfile, saveProfile } from '../services/household';
+import { deviceCurrency } from '../services/region';
 
 export const DEFAULT_PREFS: UserPreferences = {
     householdSize: 2,
     dietary: [],
     monthlyBudget: null,
-    currency: 'USD',
+    currency: deviceCurrency(),
     theme: 'system',
     haptics: true,
 };
@@ -30,7 +31,8 @@ export const usePrefs = create<PrefsState>((set, get) => ({
     load: async () => {
         try {
             const raw = await getDb().getMeta(META.prefs);
-            if (raw) set({ prefs: { ...DEFAULT_PREFS, ...JSON.parse(raw) } });
+            // Currency always follows the phone's region, whatever was saved before.
+            if (raw) set({ prefs: { ...DEFAULT_PREFS, ...JSON.parse(raw), currency: deviceCurrency() } });
         } catch {
             // Keep defaults if stored prefs are unreadable.
         }
@@ -60,7 +62,8 @@ export const usePrefs = create<PrefsState>((set, get) => ({
             householdSize: remote.householdSize ?? current.householdSize,
             dietary: remote.dietary ?? current.dietary,
             monthlyBudget: remote.monthlyBudget === undefined ? current.monthlyBudget : remote.monthlyBudget,
-            currency: remote.currency ?? current.currency,
+            // Not the account's saved currency: each device shows its own region's.
+            currency: deviceCurrency(),
         };
         set({ prefs });
         await getDb().setMeta(META.prefs, JSON.stringify(prefs));

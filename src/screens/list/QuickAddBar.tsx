@@ -6,6 +6,7 @@ import { parseItems } from '../../domain/parsing';
 import { formatQuantity } from '../../domain/units';
 import { startListening, voiceSupported } from '../../services/voice';
 import { useTable } from '../../state/hooks';
+import { useIsPro } from '../../state/session';
 import { toast, toastError } from '../../state/toast';
 import { Chip, IconButton, tap } from '../../ui/primitives';
 import { radius, spacing, useTheme } from '../../ui/theme';
@@ -16,6 +17,7 @@ import { radius, spacing, useTheme } from '../../ui/theme';
  */
 export function QuickAddBar({ listId }: { listId: string }) {
     const { colors } = useTheme();
+    const isPro = useIsPro();
     const [text, setText] = useState('');
     const [focused, setFocused] = useState(false);
     const [listening, setListening] = useState(false);
@@ -117,7 +119,7 @@ export function QuickAddBar({ listId }: { listId: string }) {
                     accessibilityLabel="Add items"
                     style={[styles.input, { color: colors.text }]}
                 />
-                {voiceSupported ? (
+                {voiceSupported && isPro ? (
                     <IconButton
                         icon={listening ? 'stop-circle' : 'mic-outline'}
                         label={listening ? 'Stop listening' : 'Add by voice'}

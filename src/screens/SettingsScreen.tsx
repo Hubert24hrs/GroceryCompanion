@@ -18,7 +18,6 @@ import { ConfirmSheet } from '../ui/Sheet';
 import { radius, spacing, useTheme } from '../ui/theme';
 import { AuthMode, AuthSheet } from './settings/AuthSheet';
 
-const CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'NGN', 'INR', 'ZAR'];
 const THEMES: { key: UserPreferences['theme']; label: string; icon: IconName }[] = [
     { key: 'system', label: 'Automatic', icon: 'phone-portrait-outline' },
     { key: 'light', label: 'Light', icon: 'sunny-outline' },
@@ -269,7 +268,7 @@ export function SettingsScreen({ navigation }: RootScreenProps<'Settings'>) {
                         </View>
                         <View style={{ gap: spacing.sm }}>
                             <Field
-                                label="Monthly grocery budget"
+                                label={`Monthly grocery budget (${prefs.currency})`}
                                 value={budget}
                                 onChangeText={setBudget}
                                 onBlur={saveBudget}
@@ -279,11 +278,9 @@ export function SettingsScreen({ navigation }: RootScreenProps<'Settings'>) {
                                 returnKeyType="done"
                                 error={budgetError}
                             />
-                            <View style={styles.chips}>
-                                {CURRENCIES.map(c => (
-                                    <Chip key={c} label={c} selected={prefs.currency === c} onPress={() => save({ currency: c })} />
-                                ))}
-                            </View>
+                            <Text variant="caption" muted>
+                                Prices show in {prefs.currency} ({formatMoney(12.5)}), the currency of your phone’s region.
+                            </Text>
                         </View>
                     </Card>
                 </Section>

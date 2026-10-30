@@ -15,6 +15,7 @@ import { usePrefs } from '../state/prefs';
 import { useIsPro, useSession } from '../state/session';
 import { toast } from '../state/toast';
 import { Button, Card, Chip, EmptyState, Field, SectionTitle, tap, Text } from '../ui/primitives';
+import { ProLock } from '../ui/ProLock';
 import { TabScreen } from '../ui/Screen';
 import { radius, spacing, useTheme } from '../ui/theme';
 import { RecipeImage } from './recipes/RecipeImage';
@@ -118,11 +119,18 @@ export function RecipesScreen({ navigation }: TabScreenProps<'Recipes'>) {
 
     return (
         <TabScreen title="Recipes" right={editable ? <Button title="New" icon="add" small onPress={newRecipe} /> : null}>
-            {suggestions.length > 0 && !query && filter === 'all' ? (
+            {!smartAllowed && suggestions.length > 0 && !query && filter === 'all' ? (
+                <ProLock
+                    title="Smart meal ideas"
+                    detail={`${suggestions.length} recipe${suggestions.length === 1 ? '' : 's'} you could cook from your pantry, ranked by expiry dates, diet and budget.`}
+                    onPress={() => navigation.navigate('Pro')}
+                />
+            ) : null}
+            {smartAllowed && suggestions.length > 0 && !query && filter === 'all' ? (
                 <View>
                     <SectionTitle title="Cook from your pantry" />
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.md, paddingRight: spacing.lg }}>
-                        {suggestions.slice(0, smartAllowed ? 5 : 1).map(s => (
+                        {suggestions.slice(0, 5).map(s => (
                             <Card key={s.recipe.id} onPress={() => open(s.recipe)} style={styles.suggestion} accessibilityLabel={`${s.recipe.title}. ${s.reasons.join('. ')}`}>
                                 <RecipeImage recipe={s.recipe} style={styles.suggestionImage} />
                                 <View style={{ flex: 1, gap: 4 }}>
@@ -141,14 +149,6 @@ export function RecipesScreen({ navigation }: TabScreenProps<'Recipes'>) {
                                 </View>
                             </Card>
                         ))}
-                        {!smartAllowed && suggestions.length > 1 ? (
-                            <Card onPress={() => navigation.navigate('Pro')} accessibilityLabel="See Pro" style={[styles.suggestion, { backgroundColor: colors.accentSoft, borderColor: colors.accentSoft }]}>
-                                <Ionicons name="sparkles" size={22} color={colors.accent} />
-                                <Text variant="caption" style={{ flex: 1 }}>
-                                    {suggestions.length - 1} more idea{suggestions.length === 2 ? '' : 's'} with Pro, ranked by pantry, expiry dates, diet and budget.
-                                </Text>
-                            </Card>
-                        ) : null}
                     </ScrollView>
                 </View>
             ) : null}

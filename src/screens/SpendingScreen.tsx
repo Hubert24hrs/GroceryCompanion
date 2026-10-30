@@ -12,28 +12,11 @@ import { useTable } from '../state/hooks';
 import { formatMoney, usePrefs } from '../state/prefs';
 import { useIsPro } from '../state/session';
 import { Button, Card, EmptyState, ProgressBar, SectionTitle, Text } from '../ui/primitives';
+import { ProLock } from '../ui/ProLock';
 import { layout } from '../ui/Screen';
 import { radius, spacing, useTheme } from '../ui/theme';
 
 const HISTORY_MONTHS = 6;
-
-function ProLock({ title, detail, onPress }: { title: string; detail: string; onPress: () => void }) {
-    const { colors } = useTheme();
-    return (
-        <Card onPress={onPress} accessibilityLabel={`${title}. ${detail}. See Pro.`} style={[styles.lock, { backgroundColor: colors.accentSoft, borderColor: colors.accentSoft }]}>
-            <Ionicons name="lock-closed" size={20} color={colors.accent} />
-            <View style={{ flex: 1 }}>
-                <Text variant="label">{title}</Text>
-                <Text variant="caption" muted>
-                    {detail}
-                </Text>
-            </View>
-            <Text variant="label" color={colors.accent}>
-                See Pro
-            </Text>
-        </Card>
-    );
-}
 
 /** Spending against budget, by month and category, plus price history per item. */
 export function SpendingScreen({ navigation }: RootScreenProps<'Spending'>) {
@@ -154,6 +137,9 @@ export function SpendingScreen({ navigation }: RootScreenProps<'Spending'>) {
 
                 <View>
                     <SectionTitle title="By aisle" />
+                    {!fullHistory ? (
+                        <ProLock title="Spending by aisle" detail="See which aisles your money goes to each month." onPress={goPro} />
+                    ) : (
                     <Card style={{ gap: spacing.md }}>
                         {categories.length === 0 ? <Text muted>No purchases this month.</Text> : null}
                         {categories.map(c => (
@@ -170,6 +156,7 @@ export function SpendingScreen({ navigation }: RootScreenProps<'Spending'>) {
                             </View>
                         ))}
                     </Card>
+                    )}
                 </View>
 
                 <View>

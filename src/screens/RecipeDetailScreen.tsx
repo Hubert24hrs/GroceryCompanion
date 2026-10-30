@@ -8,7 +8,7 @@ import { NeedStatus } from '../domain/aggregate';
 import { formatQuantity } from '../domain/units';
 import { canEdit } from '../domain/validation';
 import { useRecord, useTable } from '../state/hooks';
-import { useSession } from '../state/session';
+import { useIsPro, useSession } from '../state/session';
 import { toastError } from '../state/toast';
 import { Button, Card, EmptyState, IconButton, IconName, tap, Text } from '../ui/primitives';
 import { layout } from '../ui/Screen';
@@ -32,6 +32,7 @@ export function RecipeDetailScreen({ route, navigation }: RootScreenProps<'Recip
     const recipe = useRecord('recipes', recipeId);
     const pantry = useTable('pantry_items');
     const editable = canEdit(useSession(s => s.role));
+    const isPro = useIsPro();
     const [servings, setServings] = useState<number | null>(null);
     const [menuOpen, setMenuOpen] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
@@ -82,6 +83,8 @@ export function RecipeDetailScreen({ route, navigation }: RootScreenProps<'Recip
         recipe.calories ? { icon: 'nutrition-outline', label: `${recipe.calories} kcal / serving` } : null,
     ].filter((s): s is { icon: IconName; label: string } => !!s);
     const inPantry = lines.filter(l => l.status === 'in-pantry').length;
+    // Meal planning is Pro; free users go to the Pro screen instead.
+    const planThis = () => (isPro ? setPlanTarget({ recipeId: recipe.id, mealType: defaultMealType() }) : navigation.navigate('Pro'));
     const tags = recipe.tags.filter(t => t.toLowerCase() !== recipe.collection?.toLowerCase());
 
     return (
@@ -199,7 +202,7 @@ export function RecipeDetailScreen({ route, navigation }: RootScreenProps<'Recip
                                 title="Plan"
                                 icon="calendar-outline"
                                 variant="secondary"
-                                onPress={() => setPlanTarget({ recipeId: recipe.id, mealType: defaultMealType() })}
+                                onPress={() => planThis()}
                             />
                             <Button title="Add ingredients to a list" icon="cart-outline" onPress={() => setAddOpen(true)} style={{ flex: 1 }} />
                         </View>
@@ -219,7 +222,7 @@ export function RecipeDetailScreen({ route, navigation }: RootScreenProps<'Recip
                 onClose={() => setMenuOpen(false)}
                 title={recipe.title}
                 actions={[
-                    { label: 'Plan this meal', icon: 'calendar-outline', onPress: () => setPlanTarget({ recipeId: recipe.id, mealType: defaultMealType() }) },
+                    { label: 'Plan this meal', icon: 'calendar-outline', onPress: () => planThis() },
                     { label: 'Edit recipe', icon: 'create-outline', onPress: () => navigation.navigate('RecipeEdit', { recipeId: recipe.id }) },
                     { label: 'Delete recipe', icon: 'trash-outline', destructive: true, onPress: () => setConfirmDelete(true) },
                 ]}

@@ -13,6 +13,7 @@ import { useIsPro, useSession } from '../state/session';
 import { useSyncState } from '../state/sync';
 import { toast } from '../state/toast';
 import { Banner, Card, IconButton, IconName, ProgressBar, SectionTitle, Text } from '../ui/primitives';
+import { ProLock } from '../ui/ProLock';
 import { TabScreen } from '../ui/Screen';
 import { radius, spacing, useTheme } from '../ui/theme';
 import { countItems, ListCard } from './lists/ListCard';
@@ -151,6 +152,15 @@ export function HomeScreen({ navigation }: TabScreenProps<'Home'>) {
                 )}
             </View>
 
+            {!isPro ? (
+                <ProLock
+                    title="Get more from GroceryCompanion"
+                    detail="Meal planner, expiry and low-stock alerts, barcode scanning and unlimited lists with Pro."
+                    onPress={() => navigation.navigate('Pro')}
+                />
+            ) : null}
+
+            {isPro ? (
             <View style={styles.tiles}>
                 <StatTile
                     icon="time-outline"
@@ -167,7 +177,9 @@ export function HomeScreen({ navigation }: TabScreenProps<'Home'>) {
                     onPress={() => navigation.navigate('Pantry', { filter: 'attention' })}
                 />
             </View>
+            ) : null}
 
+            {isPro ? (
             <View>
                 <SectionTitle title="Today" action="Meal plan" onAction={() => navigation.navigate('MealPlan')} />
                 <Card style={{ gap: spacing.md }}>
@@ -190,6 +202,7 @@ export function HomeScreen({ navigation }: TabScreenProps<'Home'>) {
                     )}
                 </Card>
             </View>
+            ) : null}
 
             <View>
                 <SectionTitle title="Spending this month" action="Details" onAction={() => navigation.navigate('Spending')} />

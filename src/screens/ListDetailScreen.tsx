@@ -9,7 +9,7 @@ import { Category, ListItem } from '../domain/types';
 import { canEdit } from '../domain/validation';
 import { useRecord, useTable } from '../state/hooks';
 import { formatMoney } from '../state/prefs';
-import { useSession } from '../state/session';
+import { useIsPro, useSession } from '../state/session';
 import { toast, toastError } from '../state/toast';
 import { Button, Card, EmptyState, IconButton, ProgressBar, tap, Text } from '../ui/primitives';
 import { layout } from '../ui/Screen';
@@ -37,6 +37,7 @@ export function ListDetailScreen({ route, navigation }: RootScreenProps<'ListDet
     const list = useRecord('lists', listId);
     const allItems = useTable('items');
     const editable = canEdit(useSession(s => s.role));
+    const isPro = useIsPro();
 
     const [editing, setEditing] = useState<ListItem | null>(null);
     const [menuOpen, setMenuOpen] = useState(false);
@@ -98,7 +99,9 @@ export function ListDetailScreen({ route, navigation }: RootScreenProps<'ListDet
             label: 'Add low-stock pantry items',
             icon: 'file-tray-stacked-outline',
             onPress: () =>
-                addLowStockToList(listId).then(
+                !isPro
+                    ? navigation.navigate('Pro')
+                    : addLowStockToList(listId).then(
                     n => toast(n ? `Added ${n} low-stock item${n === 1 ? '' : 's'}.` : 'Nothing in the pantry is running low.', { tone: n ? 'success' : 'info' }),
                     toastError,
                 ),

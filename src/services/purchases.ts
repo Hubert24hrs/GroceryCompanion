@@ -28,7 +28,7 @@ let packages: PurchasesPackage[] = [];
 const isPro = (info: CustomerInfo) => Boolean(info.entitlements.active[ENTITLEMENT]);
 
 export const purchasesAvailable = Boolean(apiKey);
-export const purchasesUnavailableReason = apiKey ? null : 'Subscriptions are not configured for this build.';
+export const purchasesUnavailableReason = apiKey ? null : 'Subscriptions aren’t open yet in this version of the app.';
 
 /** Configure RevenueCat and identify the user (Firebase uid) so entitlements follow the account. */
 export async function configurePurchases(userId: string | null): Promise<boolean | null> {

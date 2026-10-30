@@ -42,9 +42,10 @@ service cloud.firestore {
       return isMember(hid) && get(memberPath(hid, me())).data.role in ['owner', 'editor'];
     }
 
-    // Free households hold 3 people; the RevenueCat webhook sets ownerPro.
+    // Free households hold 2 people (FREE_LIMITS.householdMembers in the app);
+    // the RevenueCat webhook sets ownerPro.
     function memberLimit(household) {
-      return household.ownerPro == true ? 50 : 3;
+      return household.ownerPro == true ? 50 : 2;
     }
 
     function validName(name) {

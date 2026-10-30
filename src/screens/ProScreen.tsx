@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootScreenProps } from '../navigation/navigation';
-import { PRO_FEATURES } from '../domain/entitlements';
+import { ANNUAL_SAVING, FREE_FEATURES, PRO_FEATURES, PRO_PRICES } from '../domain/entitlements';
 import {
     getPlans,
     manageSubscriptionsUrl,
@@ -20,25 +20,52 @@ import { Banner, Button, Card, IconName, Text } from '../ui/primitives';
 import { layout } from '../ui/Screen';
 import { radius, spacing, useTheme } from '../ui/theme';
 
+type Period = 'monthly' | 'annual';
+
+interface PlanCard {
+    period: Period;
+    /** Store package id when the store is available. */
+    id: string | null;
+    price: string;
+}
+
+/**
+ * Store prices when RevenueCat is configured (localised per country), else
+ * the list prices so people can see what Pro costs before it's on sale.
+ */
+function planCards(storePlans: PlanOption[] | null): PlanCard[] {
+    const fromStore = (period: Period) => storePlans?.find(p => p.period === period);
+    return (['monthly', 'annual'] as Period[]).map(period => {
+        const store = fromStore(period);
+        return { period, id: store?.id ?? null, price: store?.priceString ?? PRO_PRICES[period].label };
+    });
+}
+
 export function ProScreen({ navigation }: RootScreenProps<'Pro'>) {
     const { colors } = useTheme();
     const insets = useSafeAreaInsets();
     const isPro = useIsPro();
     const accountPro = useSession(s => s.accountPro);
-    const [plans, setPlans] = useState<PlanOption[] | null>(null);
+    const [storePlans, setStorePlans] = useState<PlanOption[] | null>(null);
     const [plansError, setPlansError] = useState<string | null>(null);
-    const [chosen, setChosen] = useState<string | null>(null);
+    const [loading, setLoading] = useState(purchasesAvailable);
+    const [chosen, setChosen] = useState<Period>('annual');
     const [busy, setBusy] = useState<'buy' | 'restore' | null>(null);
 
     useEffect(() => {
-        if (!purchasesAvailable || isPro) return;
+        if (!purchasesAvailable || isPro) {
+            setLoading(false);
+            return;
+        }
         getPlans()
-            .then(p => {
-                setPlans(p);
-                setChosen(p.find(x => x.period === 'annual')?.id ?? p[0]?.id ?? null);
-            })
-            .catch(e => setPlansError(e instanceof Error ? e.message : 'Plans could not be loaded.'));
+            .then(setStorePlans)
+            .catch(e => setPlansError(e instanceof Error ? e.message : 'Plans could not be loaded.'))
+            .finally(() => setLoading(false));
     }, [isPro]);
+
+    const cards = planCards(storePlans);
+    const selected = cards.find(c => c.period === chosen)!;
+    const canBuy = purchasesAvailable && !!selected.id;
 
     const done = (pro: boolean) => {
         useSession.getState().setStorePro(pro);
@@ -49,10 +76,10 @@ export function ProScreen({ navigation }: RootScreenProps<'Pro'>) {
     };
 
     const buy = async () => {
-        if (!chosen) return;
+        if (!selected.id) return;
         setBusy('buy');
         try {
-            done(await purchasePlan(chosen));
+            done(await purchasePlan(selected.id));
         } catch (e) {
             if (!(e instanceof PurchaseError && e.cancelled)) toastError(e);
         } finally {
@@ -84,11 +111,69 @@ export function ProScreen({ navigation }: RootScreenProps<'Pro'>) {
                         {isPro ? 'You’re on Pro' : 'GroceryCompanion Pro'}
                     </Text>
                     <Text muted style={{ textAlign: 'center' }}>
-                        {isPro ? 'Everything below is unlocked on your account.' : 'More room, smarter ideas and the full picture of your spending.'}
+                        {isPro ? 'Everything below is unlocked on your account.' : 'Every feature, for your whole kitchen. Cancel any time.'}
                     </Text>
                 </View>
 
+                {!isPro ? (
+                    <View style={{ gap: spacing.md }}>
+                        {cards.map(c => {
+                            const on = c.period === chosen;
+                            return (
+                                <Pressable
+                                    key={c.period}
+                                    onPress={() => setChosen(c.period)}
+                                    accessibilityRole="radio"
+                                    accessibilityState={{ checked: on }}
+                                    accessibilityLabel={`${c.period === 'annual' ? 'Yearly' : 'Monthly'}, ${c.price}`}
+                                    style={[styles.plan, { backgroundColor: colors.surface, borderColor: on ? colors.primary : colors.border, borderWidth: on ? 2 : 1 }]}
+                                >
+                                    <Ionicons name={on ? 'radio-button-on' : 'radio-button-off'} size={22} color={on ? colors.primary : colors.textMuted} />
+                                    <View style={{ flex: 1, gap: 2 }}>
+                                        <Text variant="subheading">{c.period === 'annual' ? 'Yearly' : 'Monthly'}</Text>
+                                        {c.period === 'annual' ? (
+                                            <View style={[styles.saveTag, { backgroundColor: colors.primarySoft }]}>
+                                                <Text variant="caption" color={colors.primary} style={{ fontWeight: '700' }}>
+                                                    Save {ANNUAL_SAVING}%
+                                                </Text>
+                                            </View>
+                                        ) : (
+                                            <Text variant="caption" muted>
+                                                Billed every month
+                                            </Text>
+                                        )}
+                                    </View>
+                                    <View style={{ alignItems: 'flex-end' }}>
+                                        <Text variant="heading">{c.price}</Text>
+                                        <Text variant="caption" muted>
+                                            {c.period === 'annual' ? 'per year' : 'per month'}
+                                        </Text>
+                                    </View>
+                                </Pressable>
+                            );
+                        })}
+
+                        {loading ? <ActivityIndicator color={colors.primary} /> : null}
+                        {plansError ? <Banner tone="danger" message={plansError} /> : null}
+                        {!purchasesAvailable ? (
+                            <Banner tone="info" icon="time-outline" message={purchasesUnavailableReason ?? 'Subscriptions are not available here.'} />
+                        ) : null}
+                        <Button
+                            title={canBuy ? `Subscribe for ${selected.price}${chosen === 'annual' ? ' / year' : ' / month'}` : 'Subscriptions open soon'}
+                            icon="sparkles"
+                            variant="accent"
+                            loading={busy === 'buy'}
+                            disabled={!canBuy || !!busy}
+                            onPress={buy}
+                        />
+                        <Text variant="caption" muted style={{ textAlign: 'center' }}>
+                            Renews automatically until cancelled in your app store account. Prices shown in your store’s local currency at checkout.
+                        </Text>
+                    </View>
+                ) : null}
+
                 <Card style={{ gap: spacing.lg }}>
+                    <Text variant="subheading">{isPro ? 'Your Pro features' : 'Everything in Pro'}</Text>
                     {PRO_FEATURES.map(f => (
                         <View key={f.feature} style={styles.feature}>
                             <View style={[styles.featureIcon, { backgroundColor: colors.accentSoft }]}>
@@ -105,58 +190,23 @@ export function ProScreen({ navigation }: RootScreenProps<'Pro'>) {
                     ))}
                 </Card>
 
-                {isPro ? (
-                    accountPro && !purchasesAvailable ? null : (
-                        <Button title="Manage subscription" icon="open-outline" variant="secondary" onPress={() => void Linking.openURL(manageSubscriptionsUrl()).catch(toastError)} />
-                    )
-                ) : !purchasesAvailable ? (
-                    <Banner tone="info" icon="phone-portrait-outline" message={purchasesUnavailableReason ?? 'Subscriptions are not available here.'} />
-                ) : plansError ? (
-                    <Banner tone="danger" message={plansError} />
-                ) : !plans ? (
-                    <ActivityIndicator color={colors.primary} />
-                ) : plans.length === 0 ? (
-                    <Banner tone="warning" message="No plans are available right now. Please try again later." />
-                ) : (
-                    <View style={{ gap: spacing.md }}>
-                        {plans.map(p => {
-                            const selected = p.id === chosen;
-                            return (
-                                <Pressable
-                                    key={p.id}
-                                    onPress={() => setChosen(p.id)}
-                                    accessibilityRole="radio"
-                                    accessibilityState={{ checked: selected }}
-                                    style={[
-                                        styles.plan,
-                                        { backgroundColor: colors.surface, borderColor: selected ? colors.primary : colors.border, borderWidth: selected ? 2 : 1 },
-                                    ]}
-                                >
-                                    <Ionicons name={selected ? 'radio-button-on' : 'radio-button-off'} size={22} color={selected ? colors.primary : colors.textMuted} />
-                                    <View style={{ flex: 1 }}>
-                                        <Text variant="label">{p.period === 'annual' ? 'Yearly' : p.period === 'monthly' ? 'Monthly' : p.title}</Text>
-                                        {p.period === 'annual' ? (
-                                            <Text variant="caption" color={colors.primary}>
-                                                Best value
-                                            </Text>
-                                        ) : null}
-                                    </View>
-                                    <Text variant="subheading">
-                                        {p.priceString}
-                                        <Text variant="caption" muted>
-                                            {p.period === 'annual' ? ' / year' : p.period === 'monthly' ? ' / month' : ''}
-                                        </Text>
-                                    </Text>
-                                </Pressable>
-                            );
-                        })}
-                        <Button title="Subscribe" icon="sparkles" variant="accent" loading={busy === 'buy'} disabled={!chosen || !!busy} onPress={buy} />
-                        <Text variant="caption" muted style={{ textAlign: 'center' }}>
-                            Renews automatically. Cancel any time in your store account settings.
-                        </Text>
-                    </View>
-                )}
+                {!isPro ? (
+                    <Card style={{ gap: spacing.sm }}>
+                        <Text variant="subheading">The free plan includes</Text>
+                        {FREE_FEATURES.map(f => (
+                            <View key={f} style={styles.freeRow}>
+                                <Ionicons name="checkmark" size={16} color={colors.textMuted} />
+                                <Text variant="caption" muted style={{ flex: 1 }}>
+                                    {f}
+                                </Text>
+                            </View>
+                        ))}
+                    </Card>
+                ) : null}
 
+                {isPro && !(accountPro && !purchasesAvailable) ? (
+                    <Button title="Manage subscription" icon="open-outline" variant="secondary" onPress={() => void Linking.openURL(manageSubscriptionsUrl()).catch(toastError)} />
+                ) : null}
                 {purchasesAvailable && !isPro ? <Button title="Restore purchases" variant="ghost" loading={busy === 'restore'} disabled={!!busy} onPress={restore} /> : null}
             </ScrollView>
         </View>
@@ -168,7 +218,9 @@ const styles = StyleSheet.create({
     content: { padding: spacing.lg, gap: spacing.xl, ...layout.page },
     hero: { alignItems: 'center', gap: spacing.sm, paddingTop: spacing.md },
     badge: { width: 64, height: 64, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm },
+    plan: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg, borderRadius: radius.md },
+    saveTag: { alignSelf: 'flex-start', paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radius.pill },
     feature: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
     featureIcon: { width: 34, height: 34, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
-    plan: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg, borderRadius: radius.md },
+    freeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
 });

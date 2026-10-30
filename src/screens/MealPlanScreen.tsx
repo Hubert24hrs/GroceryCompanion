@@ -7,10 +7,11 @@ import { addDays, formatDay, startOfWeek, today, weekDates } from '../domain/dat
 import { MealPlanEntry } from '../domain/types';
 import { canEdit } from '../domain/validation';
 import { useTable } from '../state/hooks';
-import { useSession } from '../state/session';
+import { useIsPro, useSession } from '../state/session';
 import { toast } from '../state/toast';
 import { Button, Card, IconButton, Text } from '../ui/primitives';
 import { TabScreen } from '../ui/Screen';
+import { ProGate } from '../ui/ProLock';
 import { ActionSheet } from '../ui/Sheet';
 import { radius, spacing, useTheme } from '../ui/theme';
 import { MEAL_LABEL, MEAL_ORDER, MEAL_TYPES, WEEK_STARTS_ON } from './mealplan/mealUi';
@@ -26,7 +27,29 @@ function weekLabel(start: string, current: string): string {
     return `${formatDay(start, { month: 'short', day: 'numeric' })} – ${formatDay(end, { month: 'short', day: 'numeric' })}`;
 }
 
-export function MealPlanScreen({ navigation }: TabScreenProps<'MealPlan'>) {
+/** Meal planning is a Pro feature; free users see what it does and how to unlock it. */
+export function MealPlanScreen(props: TabScreenProps<'MealPlan'>) {
+    const isPro = useIsPro();
+    if (isPro) return <MealPlanner {...props} />;
+    return (
+        <TabScreen title="Meal Plan">
+            <ProGate
+                icon="calendar"
+                title="Plan the week with Pro"
+                detail="Put recipes on a calendar and turn the whole week into one shopping list."
+                points={[
+                    'Breakfast, lunch, dinner and snacks for every day',
+                    'One combined list for the week, minus what is in your pantry',
+                    'Copy last week in one tap',
+                    'Meal ideas ranked by what you already have',
+                ]}
+                onPress={() => props.navigation.navigate('Pro')}
+            />
+        </TabScreen>
+    );
+}
+
+function MealPlanner({ navigation }: TabScreenProps<'MealPlan'>) {
     const { colors } = useTheme();
     const meals = useTable('meal_plan_entries');
     const recipes = useTable('recipes');

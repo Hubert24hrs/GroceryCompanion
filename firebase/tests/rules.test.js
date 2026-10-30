@@ -81,6 +81,9 @@ function row(hid, id, extra = {}) {
     };
 }
 
+/** Lift the free member limit, as the RevenueCat webhook does for Pro owners. */
+const makePro = hid => asAdmin(store => updateDoc(doc(store, 'households', hid), { ownerPro: true }));
+
 async function aliceWithHousehold() {
     await bootstrap(db('alice'), 'alice', 'h1');
     await setDoc(doc(db('alice'), 'invites', 'EDITCODE01'), invite('EDITCODE01', 'h1', 'editor'));
@@ -246,12 +249,12 @@ describe('invites', () => {
 });
 
 describe('member limit and Pro', () => {
-    test('free households are capped at 3 members; Pro (set by the webhook) lifts it', async () => {
+    test('free households are capped at 2 members; Pro (set by the webhook) lifts it', async () => {
         await aliceWithHousehold();
         await assertSucceeds(join(db('bob'), 'bob', 'h1', 'EDITCODE01', 'editor'));
-        await assertSucceeds(join(db('carol'), 'carol', 'h1', 'EDITCODE01', 'editor'));
-        await assertFails(join(db('dave'), 'dave', 'h1', 'EDITCODE01', 'editor'));
+        await assertFails(join(db('carol'), 'carol', 'h1', 'EDITCODE01', 'editor'));
         await asAdmin(store => updateDoc(doc(store, 'households', 'h1'), { ownerPro: true }));
+        await assertSucceeds(join(db('carol'), 'carol', 'h1', 'EDITCODE01', 'editor'));
         await assertSucceeds(join(db('dave'), 'dave', 'h1', 'EDITCODE01', 'editor'));
     });
 
@@ -289,6 +292,7 @@ describe('membership changes', () => {
 
     test('members cannot remove each other', async () => {
         await aliceWithHousehold();
+        await makePro('h1');
         await join(db('bob'), 'bob', 'h1', 'EDITCODE01', 'editor');
         await join(db('carol'), 'carol', 'h1', 'EDITCODE01', 'editor');
         await assertFails(leave(db('bob'), 'bob', 'h1', 'carol'));
@@ -296,6 +300,7 @@ describe('membership changes', () => {
 
     test('the owner changes roles; nobody else can', async () => {
         await aliceWithHousehold();
+        await makePro('h1');
         await join(db('bob'), 'bob', 'h1', 'EDITCODE01', 'editor');
         await join(db('vic'), 'vic', 'h1', 'VIEWCODE01', 'viewer');
         await assertSucceeds(updateDoc(doc(db('alice'), 'households/h1/members/bob'), { role: 'viewer' }));

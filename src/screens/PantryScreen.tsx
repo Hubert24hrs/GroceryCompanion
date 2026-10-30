@@ -4,15 +4,17 @@ import { TabScreenProps } from '../navigation/navigation';
 import { addItem, addLowStockToList, adjustPantryQuantity, updatePantryItem } from '../data/repo';
 import { expiryStatus, isLowStock, itemKey } from '../domain/pantry';
 import { today } from '../domain/dates';
+import { hasFeature } from '../domain/entitlements';
 import { PantryItem, ShoppingList } from '../domain/types';
 import { formatQuantity } from '../domain/units';
 import { canEdit } from '../domain/validation';
 import { getDb } from '../data/db';
 import { LookupError, lookupBarcode } from '../services/barcode';
 import { useTable } from '../state/hooks';
-import { useSession } from '../state/session';
+import { useIsPro, useSession } from '../state/session';
 import { toast, toastError } from '../state/toast';
 import { Banner, Button, Card, Chip, EmptyState, Field, IconButton, SectionTitle, Text } from '../ui/primitives';
+import { ProLock } from '../ui/ProLock';
 import { TabScreen } from '../ui/Screen';
 import { ActionSheet } from '../ui/Sheet';
 import { radius, spacing, useTheme } from '../ui/theme';
@@ -26,6 +28,8 @@ export function PantryScreen({ route, navigation }: TabScreenProps<'Pantry'>) {
     const pantry = useTable('pantry_items');
     const lists = useTable('lists');
     const editable = canEdit(useSession(s => s.role));
+    const isPro = useIsPro();
+    const alertsAllowed = hasFeature(isPro, 'pantryAlerts');
     const day = today();
 
     const [filter, setFilter] = useState<PantryFilter>('all');
@@ -39,10 +43,10 @@ export function PantryScreen({ route, navigation }: TabScreenProps<'Pantry'>) {
     // Home's "expiring" / "running low" tiles deep-link here.
     useEffect(() => {
         if (route.params?.filter) {
-            setFilter(route.params.filter);
+            setFilter(route.params.filter === 'attention' && !alertsAllowed ? 'all' : route.params.filter);
             navigation.setParams({ filter: undefined });
         }
-    }, [route.params?.filter, navigation]);
+    }, [route.params?.filter, navigation, alertsAllowed]);
 
     const activeLists = useMemo(
         () => lists.filter(l => !l.isArchived && !l.isTemplate).sort((a, b) => a.sortOrder - b.sortOrder),
@@ -140,7 +144,7 @@ export function PantryScreen({ route, navigation }: TabScreenProps<'Pantry'>) {
 
     const filters: { key: PantryFilter; label: string }[] = [
         { key: 'all', label: `All ${pantry.length}` },
-        { key: 'attention', label: 'Needs attention' },
+        ...(alertsAllowed ? [{ key: 'attention' as const, label: 'Needs attention' }] : []),
         ...LOCATIONS.map(l => ({ key: l.key, label: l.label })),
     ];
 
@@ -150,7 +154,12 @@ export function PantryScreen({ route, navigation }: TabScreenProps<'Pantry'>) {
             right={
                 editable ? (
                     <>
-                        <IconButton icon="barcode-outline" label="Scan a barcode" onPress={() => setScanOpen(true)} filled />
+                        <IconButton
+                            icon="barcode-outline"
+                            label="Scan a barcode"
+                            onPress={() => (hasFeature(isPro, 'barcodeScanner') ? setScanOpen(true) : navigation.navigate('Pro'))}
+                            filled
+                        />
                         <Button title="Add" icon="add" small onPress={() => setDraft({})} />
                     </>
                 ) : null
@@ -168,7 +177,14 @@ export function PantryScreen({ route, navigation }: TabScreenProps<'Pantry'>) {
                 </Card>
             ) : (
                 <>
-                    {(expiring.length > 0 || low.length > 0) && filter === 'all' && !query ? (
+                    {!alertsAllowed && (expiring.length > 0 || low.length > 0) && !query ? (
+                        <ProLock
+                            title="Expiry & low-stock alerts"
+                            detail="See what to use soon and restock what's running low in one tap."
+                            onPress={() => navigation.navigate('Pro')}
+                        />
+                    ) : null}
+                    {alertsAllowed && (expiring.length > 0 || low.length > 0) && filter === 'all' && !query ? (
                         <View style={styles.alerts}>
                             {expiring.length > 0 ? (
                                 <Card style={[styles.alert, { borderLeftColor: colors.accent }]}>
