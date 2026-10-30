@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Type-check, lint and tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - name: Cloud Functions tests
+        run: npm --prefix functions ci && npm --prefix functions test
+
+  android:
+    name: Android release APK (arm64)
+    needs: checks
+    runs-on: ubuntu-latest
+    env:
+      # The Firebase web config is public by design (it ships in every app build);
+      # Firebase Hosting already serves it, so CI reads it from there instead of a secret.
+      FIREBASE_CONFIG_URL: https://grocery-companion-hub.web.app/__/firebase/init.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - run: npm ci
+      - name: Write .env from the published Firebase config
+        run: |
+          curl -fsSL "$FIREBASE_CONFIG_URL" -o firebase-config.json
+          node -e '
+            const c = require("./firebase-config.json");
+            const lines = {
+              EXPO_PUBLIC_FIREBASE_API_KEY: c.apiKey,
+              EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: c.authDomain,
+              EXPO_PUBLIC_FIREBASE_PROJECT_ID: c.projectId,
+              EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: c.storageBucket,
+              EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: c.messagingSenderId,
+              EXPO_PUBLIC_FIREBASE_APP_ID: c.appId,
+              EXPO_PUBLIC_FIREBASE_EMULATORS: "0",
+            };
+            require("fs").writeFileSync(".env", Object.entries(lines).map(([k, v]) => `${k}=${v ?? ""}`).join("\n") + "\n");
+          '
+          rm firebase-config.json
+      - name: Generate the native Android project
+        run: npx expo prebuild --platform android --no-install
+      - name: Build release APK
+        working-directory: android
+        run: ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GroceryCompanion-arm64-release
+          path: android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 14
