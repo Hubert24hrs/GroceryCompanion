@@ -30,7 +30,15 @@
         "android.permission.INTERNET"
       ],
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -53,7 +61,8 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow GroceryCompanion to access your camera."
+          "cameraPermission": "Allow GroceryCompanion to access your camera.",
+          "recordAudioAndroid": false
         }
       ],
       "expo-font",
@@ -61,8 +70,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "your-project-id"
+        "projectId": "ac282486-80df-482d-a161-72931cfe7c1b"
       }
-    }
+    },
+    "owner": "hubert24hrs"
   }
 }

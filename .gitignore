@@ -48,3 +48,4 @@ tsc_output.txt
 # Firebase CLI deploy cache and emulator logs
 .firebase/
 *-debug.log
+release/
