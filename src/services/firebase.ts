@@ -42,8 +42,9 @@ if (isBackendConfigured) {
     // Same region the functions are deployed to (functions/src/index.ts).
     functions = getFunctions(app, 'europe-west1');
     if (usingEmulators) {
-        // The Android emulator reaches the host machine at 10.0.2.2.
-        const host = Platform.OS === 'android' ? '10.0.2.2' : '127.0.0.1';
+        // The Android emulator reaches the host machine at 10.0.2.2. A USB phone
+        // can use 127.0.0.1 after `adb reverse tcp:9099 tcp:9099` (and 8080, 5001).
+        const host = process.env.EXPO_PUBLIC_FIREBASE_EMULATOR_HOST || (Platform.OS === 'android' ? '10.0.2.2' : '127.0.0.1');
         connectAuthEmulator(auth, `http://${host}:9099`, { disableWarnings: true });
         connectFirestoreEmulator(firestore, host, 8080);
         connectFunctionsEmulator(functions, host, 5001);
