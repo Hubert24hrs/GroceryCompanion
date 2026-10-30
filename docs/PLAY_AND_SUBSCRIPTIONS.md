@@ -13,8 +13,8 @@ Play app ID 4975141314886525836, package `com.hubert24hrs.grocerycompanion`.
 | Data safety | App content | Saved |
 | Store listing text and graphics | Store listings | Saved; icon and feature graphic labelled as AI-made |
 | Category (Food & drink) | Store settings | Saved |
-| Contact email | Store settings → Store Listing contact details | Needs your email (public) |
-| Content rating | App content | Needs your email; answers below |
+| Contact details | Store settings | Saved |
+| Content rating | App content | Email and category filled in; you accept IARC's terms, answers below |
 
 **Sign-in details must change before Pro goes on sale.** It's **No** today because no sign-in
 is required and Pro can't be bought in this build. Play needs login details for a Pro account
