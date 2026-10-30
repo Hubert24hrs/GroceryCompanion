@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import appConfig from '../../app.json';
 import { RootScreenProps } from '../navigation/navigation';
@@ -18,6 +18,8 @@ import { ConfirmSheet } from '../ui/Sheet';
 import { radius, spacing, useTheme } from '../ui/theme';
 import { AuthMode, AuthSheet } from './settings/AuthSheet';
 import { DeleteAccountSheet } from './settings/DeleteAccountSheet';
+
+const PRIVACY_URL = 'https://grocery-companion-hub.web.app/privacy';
 
 const THEMES: { key: UserPreferences['theme']; label: string; icon: IconName }[] = [
     { key: 'system', label: 'Automatic', icon: 'phone-portrait-outline' },
@@ -308,6 +310,9 @@ export function SettingsScreen({ navigation }: RootScreenProps<'Settings'>) {
                                 />
                             </View>
                         ) : null}
+                    </Card>
+                    <Card style={styles.card}>
+                        <Row icon="shield-checkmark-outline" label="Privacy policy" onPress={() => void Linking.openURL(PRIVACY_URL).catch(toastError)} />
                     </Card>
                 </Section>
 
