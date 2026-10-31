@@ -7,7 +7,9 @@ import {
     Firestore,
     FirestoreError,
     getDoc,
+    getDocFromServer,
     getDocs,
+    getDocsFromServer,
     increment,
     query,
     serverTimestamp,
@@ -49,14 +51,18 @@ function toDate(value: unknown): string {
     return value instanceof Timestamp ? value.toDate().toISOString() : new Date().toISOString();
 }
 
-/** Every household the user belongs to, owned ones first. */
+/**
+ * Every household the user belongs to, owned ones first. Always asks the server:
+ * on a weak connection getDocs answers from an empty cache, and callers treat
+ * "no memberships" as "the household was deleted" and clear local data.
+ */
 export async function myMemberships(uid: string): Promise<Membership[]> {
-    const snap = await getDocs(query(collectionGroup(db(), 'members'), where('userId', '==', uid)));
+    const snap = await getDocsFromServer(query(collectionGroup(db(), 'members'), where('userId', '==', uid)));
     const result: Membership[] = [];
     for (const m of snap.docs) {
         const householdRef = m.ref.parent.parent;
         if (!householdRef) continue;
-        const h = await getDoc(householdRef);
+        const h = await getDocFromServer(householdRef);
         if (!h.exists()) continue;
         result.push({
             role: m.get('role') as Role,

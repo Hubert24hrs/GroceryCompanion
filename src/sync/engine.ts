@@ -214,6 +214,8 @@ export class SyncEngine {
         const pageSize = this.opts.pageSize ?? 500;
         for (const table of SYNCED_TABLES) {
             let cursor = parseCursor(await this.db.getMeta(cursorKey(table)));
+            // Nothing stored for this household: a saved position would skip every row.
+            if (cursor && !this.hasLocalRows(table)) cursor = null;
             for (;;) {
                 const rows = await remote.pull(table, cursor, pageSize).catch(e => {
                     throw toRemoteError(e);
@@ -227,6 +229,10 @@ export class SyncEngine {
                 if (rows.length < pageSize) break;
             }
         }
+    }
+
+    private hasLocalRows(table: SyncedTable): boolean {
+        return (this.db.all(table) as SyncedRecord[]).some(r => r.householdId === this.db.householdId);
     }
 
     merge<T extends SyncedTable>(table: T, row: RemoteRow): void {

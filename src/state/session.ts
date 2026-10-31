@@ -176,6 +176,7 @@ export const useSession = create<SessionState>((set, get) => {
             // Our only household was deleted by its owner: start a fresh one of our own.
             await db.removeHouseholdData(db.householdId);
             const own = await backend.ownHousehold(user);
+            await syncController.engine?.resetCursors();
             await db.setMeta(META.activeHouseholdId, own);
             db.setHousehold(own, user.id);
             syncController.start(user.id, own, () => void get().refreshHousehold());
@@ -187,6 +188,7 @@ export const useSession = create<SessionState>((set, get) => {
             // Removed from the active household: switch to another one.
             await db.removeHouseholdData(db.householdId);
             active = memberships.find(m => m.role === 'owner') ?? memberships[0];
+            await syncController.engine?.resetCursors();
             await db.setMeta(META.activeHouseholdId, active.household.id);
             db.setHousehold(active.household.id, user.id);
             syncController.start(user.id, active.household.id, () => void get().refreshHousehold());

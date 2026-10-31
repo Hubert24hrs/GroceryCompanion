@@ -101,6 +101,22 @@ describe('sync engine', () => {
         expect(engine.state.status).toBe('idle');
     });
 
+    test('a device with no local rows ignores a saved pull position and re-downloads', async () => {
+        const db = await freshDb();
+        const { remote, rows } = fakeRemote();
+        const list = createList({ name: 'Weekly', color: '#000' });
+        const engine = new SyncEngine(db, remote);
+        await engine.syncNow();
+        await engine.syncNow(); // stores a pull position past the only row
+        expect(rows.size).toBe(1);
+
+        await db.removeHouseholdData('h1'); // what a wipe leaves behind: no rows, position kept
+        expect(db.list('lists')).toHaveLength(0);
+
+        await engine.syncNow();
+        expect(db.get('lists', list.id)?.name).toBe('Weekly');
+    });
+
     test('a newer server edit wins over an older unsynced local edit', async () => {
         const db = await freshDb();
         const { remote, rows } = fakeRemote();
