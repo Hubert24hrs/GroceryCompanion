@@ -14,6 +14,7 @@ import {
     purchasesUnavailableReason,
     restorePurchases,
 } from '../services/purchases';
+import { isBackendConfigured } from '../services/firebase';
 import { useIsPro, useSession } from '../state/session';
 import { toast, toastError } from '../state/toast';
 import { Banner, Button, Card, IconName, Text } from '../ui/primitives';
@@ -77,6 +78,11 @@ export function ProScreen({ navigation }: RootScreenProps<'Pro'>) {
 
     const buy = async () => {
         if (!selected.id) return;
+        // A purchase made signed out never reaches the account, so the server can't unlock Pro.
+        if (isBackendConfigured && !useSession.getState().user) {
+            toast('Sign in first so Pro stays with your account.', { tone: 'info', actionLabel: 'Settings', onAction: () => navigation.navigate('Settings') });
+            return;
+        }
         setBusy('buy');
         try {
             done(await purchasePlan(selected.id));

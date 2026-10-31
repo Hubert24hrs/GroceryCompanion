@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import Purchases, { CustomerInfo, PurchasesPackage } from 'react-native-purchases';
+import Purchases, { CustomerInfo, PURCHASES_ERROR_CODE, PurchasesPackage } from 'react-native-purchases';
 import { ENTITLEMENT_ID } from '../domain/entitlements';
 
 export interface PlanOption {
@@ -75,8 +75,10 @@ export async function purchasePlan(id: string): Promise<boolean> {
         const { customerInfo } = await Purchases.purchasePackage(pkg);
         return isPro(customerInfo);
     } catch (e) {
-        const err = e as { userCancelled?: boolean; message?: string };
+        const err = e as { userCancelled?: boolean; code?: string; message?: string };
         if (err.userCancelled) throw new PurchaseError('Purchase cancelled', true);
+        // The store already has this subscription, e.g. bought before signing in.
+        if (err.code === PURCHASES_ERROR_CODE.PRODUCT_ALREADY_PURCHASED_ERROR) return restorePurchases();
         throw new PurchaseError(err.message || 'The purchase could not be completed.');
     }
 }
