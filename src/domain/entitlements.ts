@@ -45,7 +45,7 @@ export const OWNER_PRO_UNLOCKS_HOUSEHOLD = true;
 /** Set a feature to 'free' to open it to everyone. Anything not listed needs Pro. */
 export const FEATURE_ACCESS: Partial<Record<ProFeature, 'free' | 'pro'>> = {
     liveSync: 'pro',
-    recipeToList: 'pro',
+    recipeToList: 'free',
     pantryAlerts: 'pro',
     delivery: 'pro',
 };
@@ -67,14 +67,13 @@ export const DELIVERY_COUNTRIES = ['US', 'CA'];
 export const FREE_FEATURES: string[] = [
     `${FREE_LIMITS.activeLists} shopping lists with quick add and aisle sorting`,
     'Pantry with quantities',
-    `Up to ${FREE_LIMITS.recipes} saved recipes`,
+    `Up to ${FREE_LIMITS.recipes} saved recipes, with ingredients to your list in one tap`,
     'Share with 1 other person',
     "This month's spending total",
 ];
 
 export const PRO_FEATURES: { feature: ProFeature; title: string; detail: string; icon: string }[] = [
     { feature: 'liveSync', title: 'Live family sync', detail: 'See the open list change as your household shops', icon: 'sync' },
-    { feature: 'recipeToList', title: 'Recipe to list', detail: 'Add ingredients, skipping what you already have', icon: 'cart' },
     { feature: 'unlimitedLists', title: 'Unlimited lists', detail: `Free includes ${FREE_LIMITS.activeLists} lists`, icon: 'list' },
     { feature: 'listTemplates', title: 'Reusable list templates', detail: 'Weekly staples in one tap', icon: 'copy' },
     { feature: 'mealPlanner', title: 'Meal planner', detail: 'Plan the week and get one shopping list', icon: 'calendar' },

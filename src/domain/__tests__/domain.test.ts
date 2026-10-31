@@ -2,7 +2,7 @@ import { consolidateIngredients, itemsToBuy } from '../aggregate';
 import { autoCategorize } from '../categories';
 import * as serverDelivery from '../../../functions/src/delivery';
 import { DeliveryProvider, isValidPostalCode, itemsForDelivery, providerFor, resolveCountry } from '../delivery';
-import { canLiveSync, DELIVERY_COUNTRIES, DELIVERY_MODE, FEATURE_ACCESS, hasFeature } from '../entitlements';
+import { canAddRecipe, canLiveSync, DELIVERY_COUNTRIES, DELIVERY_MODE, FEATURE_ACCESS, FREE_LIMITS, hasFeature } from '../entitlements';
 import { planExpiryAlerts } from '../expiryAlerts';
 import { defaultPantryLocation, expiryStatus, isLowStock, itemKey } from '../pantry';
 import { parseItems, parseNumber } from '../parsing';
@@ -166,8 +166,15 @@ describe('entitlements', () => {
         expect(canLiveSync(false, true)).toBe(true);
     });
 
+    test('recipe to list is free, with the recipe cap', () => {
+        expect(hasFeature(false, 'recipeToList')).toBe(true);
+        expect(canAddRecipe(false, FREE_LIMITS.recipes - 1)).toBe(true);
+        expect(canAddRecipe(false, FREE_LIMITS.recipes)).toBe(false);
+        expect(canAddRecipe(true, FREE_LIMITS.recipes)).toBe(true);
+    });
+
     test('the new features need Pro', () => {
-        for (const feature of ['liveSync', 'recipeToList', 'pantryAlerts', 'delivery'] as const) {
+        for (const feature of ['liveSync', 'pantryAlerts', 'delivery'] as const) {
             expect(FEATURE_ACCESS[feature]).toBe('pro');
             expect(hasFeature(false, feature)).toBe(false);
             expect(hasFeature(true, feature)).toBe(true);

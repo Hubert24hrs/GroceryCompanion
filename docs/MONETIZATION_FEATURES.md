@@ -13,14 +13,14 @@ The backend is already Firebase, so nothing needed migrating.
 | Real-time family sync | Partial: live for everyone, on all tables, with no gate | Pro gate in the app and the rules; listens to the open list only; pull-to-refresh |
 | Pantry | Exists | Nothing |
 | Saved recipes, pasted ingredients, free cap of 10 | Exists | Nothing |
-| Recipe to list, with review, pantry skip and merge | Exists, free | Pro gate |
+| Recipe to list, with review, pantry skip and merge | Exists, free with a cap of 10 recipes | Nothing: stays free |
 | Expiry alerts | Partial: on-screen only, no notifications | Local notifications, permission flow, 1 to 7 days before |
 | Instacart delivery | Missing | Everything, off by default |
 
 ## Gating
 
-Everything new is Pro, as requested. The spec's default had recipe-to-list free with a cap;
-to go back to that, set `recipeToList: 'free'` in `FEATURE_ACCESS`.
+Live sync, expiry alerts and delivery are Pro. Recipe to list stays free, with the cap on saved
+recipes in `FREE_LIMITS.recipes`. Each is one line in `FEATURE_ACCESS`.
 
 `OWNER_PRO_UNLOCKS_HOUSEHOLD` also lives in `firestore.rules`, because the rules can't read the
 app's config. `DELIVERY_COUNTRIES` and the delivery Pro check are repeated in
@@ -84,8 +84,8 @@ banner and nothing leaves the app.
 - Delete the item: its reminder is cancelled.
 
 **Recipe to list**
-- Free: "Add ingredients to a list" opens the Pro screen.
-- Pro: the sheet opens, with pantry and on-list items unticked.
+- Free or Pro: the sheet opens, with pantry and on-list items unticked.
+- Free: saving an eleventh recipe is refused, with a link to Pro.
 
 **Delivery region** (mock build, Settings then Country for delivery)
 - United States: the list menu shows "Shop on Instacart"; ZIP `94105` is accepted, `9410` refused.
