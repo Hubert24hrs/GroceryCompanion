@@ -7,25 +7,20 @@ const PREFIX = 'gc:v2:';
  * data is small (hundreds to a few thousand rows), well inside the quota.
  */
 export class WebStorageAdapter implements StorageAdapter {
-    private cache = new Map<string, Record<string, StoredRecord>>();
-
     constructor(private storage: Storage = globalThis.localStorage) {}
 
     async init(): Promise<void> {
         if (!this.storage) throw new Error('localStorage is not available');
     }
 
+    // Always the stored copy: another tab may have written since, and writing back
+    // an older copy would erase its rows while the shared pull cursor stays ahead.
     private read(table: string): Record<string, StoredRecord> {
-        let data = this.cache.get(table);
-        if (!data) {
-            try {
-                data = JSON.parse(this.storage.getItem(PREFIX + table) ?? '{}') as Record<string, StoredRecord>;
-            } catch {
-                data = {};
-            }
-            this.cache.set(table, data);
+        try {
+            return JSON.parse(this.storage.getItem(PREFIX + table) ?? '{}') as Record<string, StoredRecord>;
+        } catch {
+            return {};
         }
-        return data;
     }
 
     private write(table: string, data: Record<string, StoredRecord>) {
@@ -68,7 +63,6 @@ export class WebStorageAdapter implements StorageAdapter {
             if (k?.startsWith(PREFIX)) keys.push(k);
         }
         keys.forEach(k => this.storage.removeItem(k));
-        this.cache.clear();
     }
 
     async readLegacy(): Promise<LegacyData | null> {

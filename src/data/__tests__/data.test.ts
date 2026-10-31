@@ -2,6 +2,7 @@ import { addItem, addLowStockToList, addPantryItem, createList, finishTrip, togg
 import { LocalDatabase, setDb } from '../db';
 import { importLegacy } from '../legacy';
 import { MemoryAdapter } from '../storage/memoryAdapter';
+import { WebStorageAdapter } from '../storage/webAdapter';
 import { RemoteApi, SyncEngine } from '../../sync/engine';
 import { RemoteRow } from '../../sync/mapping';
 import { hostOf } from '../../domain/validation';
@@ -132,5 +133,22 @@ describe('sync engine', () => {
         await engine.syncNow();
         expect(db.get('lists', list.id)?.name).toBe('Remote rename');
         expect(db.pendingOutbox()).toHaveLength(0);
+    });
+});
+
+describe('web storage', () => {
+    test('two tabs writing the same table keep each other\'s rows', async () => {
+        const stored = new Map<string, string>();
+        const storage = {
+            getItem: (k: string) => stored.get(k) ?? null,
+            setItem: (k: string, v: string) => void stored.set(k, v),
+            removeItem: (k: string) => void stored.delete(k),
+        } as unknown as Storage;
+        const [tabA, tabB] = [new WebStorageAdapter(storage), new WebStorageAdapter(storage)];
+        await tabA.loadTable('lists');
+        await tabB.loadTable('lists');
+        await tabA.putMany('lists', [{ id: 'a' }]);
+        await tabB.putMany('lists', [{ id: 'b' }]);
+        expect((await tabA.loadTable('lists')).map(r => r.id).sort()).toEqual(['a', 'b']);
     });
 });
