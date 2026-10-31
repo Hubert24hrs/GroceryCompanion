@@ -10,7 +10,7 @@ const POINTS: { icon: IconName; title: string; detail: string }[] = [
     { icon: 'list', title: 'Lists sorted by aisle', detail: 'Type "2 lb chicken, milk, 6 eggs" and everything lands in the right section.' },
     { icon: 'file-tray-stacked', title: 'A pantry that remembers', detail: "Know what's running low or about to expire before you shop." },
     { icon: 'calendar', title: 'Plan the week, get the list', detail: 'Recipes on the calendar turn into one consolidated shopping list.' },
-    { icon: 'people', title: 'Shop together', detail: 'Share your household so everyone sees the same list in real time.' },
+    { icon: 'people', title: 'Shop together', detail: 'Share your household so everyone shops from the same lists.' },
 ];
 
 export function OnboardingScreen() {
