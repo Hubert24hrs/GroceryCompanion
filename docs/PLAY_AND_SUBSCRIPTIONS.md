@@ -26,8 +26,8 @@ details.
 
 ## 2. Internal testing (done)
 
-Release 6 (1.0.0), which includes the RevenueCat key and the sync fix, is live on the internal
-track, with the Owner tester list.
+Release 8 (1.0.0), with Pro live sync and expiry alerts, is live on the internal track, with the
+Owner tester list.
 Opt-in link: https://play.google.com/apps/internaltest/4700202274636462994
 
 Later, for **Closed testing**, add at least 12 testers. They must stay opted in for 14 days

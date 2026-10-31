@@ -4,6 +4,30 @@ Status, setup steps and test plan for the three features on `feat/monetization-f
 Every decision (feature gates, limits, entitlement, delivery countries) is in
 [src/domain/entitlements.ts](../src/domain/entitlements.ts).
 
+## Test results
+
+Run on 2026-10-31 on build 8, installed from Play on the test phone, with the web preview as the
+second device and a sandbox subscription.
+
+| Check | Result |
+|---|---|
+| Rules, index and functions deployed | Done |
+| Free: recipe to list opens; alerts and Pro features lead to the Pro screen | Passed |
+| Pro: webhook sets `isPro` and `ownerPro`, app unlocks | Passed, after the renewal below |
+| Live sync, PC to phone | Passed, about 6 seconds |
+| Live sync, phone to PC | Passed, about 4 seconds |
+| Listener stops when the list closes, catches up on reopening | Passed |
+| Expiry reminder scheduled at 9 am, 2 days before; channel created | Passed |
+| A reminder actually appearing at 9 am | Not seen: it needs the phone to reach that time |
+| Two people in one household | Rules tests only |
+| Real Instacart API | Not possible: applications are closed |
+| Sign-in prompt before buying; already-owned restore (in later commits) | Not on a device yet: needs a new build |
+
+Buying before signing in was found this way. The event arrives with an anonymous ID, so the webhook
+records nothing until a renewal carries the account ID. Restore fixed the phone at once, and the next
+renewal fixed the server, about 12 minutes later. With a real monthly plan that wait would be a month,
+which is why the app now asks for sign-in first.
+
 ## Audit
 
 The backend is already Firebase, so nothing needed migrating.
