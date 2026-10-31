@@ -172,6 +172,9 @@ export interface UserPreferences {
     liveHintDismissed: boolean;
     expiryAlerts: boolean;
     expiryAlertDays: number;
+    /** Overrides the phone's region for delivery only; prices keep the phone's currency. */
+    country: string | null;
+    postalCode: string | null;
 }
 
 export const SYNCED_TABLES = ['lists', 'items', 'pantry_items', 'recipes', 'meal_plan_entries', 'purchases'] as const;

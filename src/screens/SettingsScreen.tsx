@@ -7,9 +7,11 @@ import { RootScreenProps } from '../navigation/navigation';
 import { relativeTime } from '../domain/dates';
 import { UserPreferences } from '../domain/types';
 import { parseMoney } from '../domain/validation';
-import { EXPIRY_ALERT_DAY_OPTIONS, hasFeature } from '../domain/entitlements';
+import { OTHER_COUNTRY } from '../domain/delivery';
+import { DELIVERY_COUNTRIES, DELIVERY_MODE, EXPIRY_ALERT_DAY_OPTIONS, hasFeature } from '../domain/entitlements';
 import { isBackendConfigured } from '../services/firebase';
 import { notificationsAvailable } from '../services/notifications';
+import { deviceRegion } from '../services/region';
 import { enableExpiryAlerts } from '../state/expiryAlerts';
 import { DIETARY_OPTIONS, formatMoney, usePrefs } from '../state/prefs';
 import { useIsPro, useSession } from '../state/session';
@@ -23,6 +25,8 @@ import { AuthMode, AuthSheet } from './settings/AuthSheet';
 import { DeleteAccountSheet } from './settings/DeleteAccountSheet';
 
 const PRIVACY_URL = 'https://grocery-companion-hub.web.app/privacy';
+
+const COUNTRY_NAMES: Record<string, string> = { US: 'United States', CA: 'Canada', [OTHER_COUNTRY]: 'Other' };
 
 const THEMES: { key: UserPreferences['theme']; label: string; icon: IconName }[] = [
     { key: 'system', label: 'Automatic', icon: 'phone-portrait-outline' },
@@ -309,6 +313,17 @@ export function SettingsScreen({ navigation }: RootScreenProps<'Settings'>) {
                                 ))}
                             </View>
                         </View>
+                        {DELIVERY_MODE !== 'off' ? (
+                            <View style={{ gap: spacing.sm }}>
+                                <Text>Country for delivery</Text>
+                                <View style={styles.chips}>
+                                    <Chip label={`Automatic${deviceRegion() ? ` (${deviceRegion()})` : ''}`} selected={prefs.country === null} onPress={() => save({ country: null })} />
+                                    {[...DELIVERY_COUNTRIES, OTHER_COUNTRY].map(c => (
+                                        <Chip key={c} label={COUNTRY_NAMES[c] ?? c} selected={prefs.country === c} onPress={() => save({ country: c })} />
+                                    ))}
+                                </View>
+                            </View>
+                        ) : null}
                         {notificationsAvailable ? (
                             <View style={{ gap: spacing.sm }}>
                                 <View style={styles.inline}>

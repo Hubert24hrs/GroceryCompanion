@@ -303,6 +303,12 @@ describe('live sync', () => {
         await assertFails(newest(db('alice'), 1));
     });
 
+    test('delivery links are server-only', async () => {
+        await aliceWithHousehold();
+        await assertFails(getDoc(doc(db('alice'), 'deliveryLinks', 'alice')));
+        await assertFails(setDoc(doc(db('alice'), 'deliveryLinks', 'alice'), { count: 0 }));
+    });
+
     test('Pro never opens another household', async () => {
         await sharedHousehold();
         await asAdmin(store => updateDoc(doc(store, 'households', 'h1'), { ownerPro: true }));

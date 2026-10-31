@@ -1,9 +1,22 @@
 import { initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
-import { defineSecret, defineString } from 'firebase-functions/params';
+import { createHash } from 'node:crypto';
+import { defineBoolean, defineSecret, defineString } from 'firebase-functions/params';
 import { logger } from 'firebase-functions/v2';
 import { HttpsError, onCall, onRequest } from 'firebase-functions/v2/https';
 import { deleteAccountData, isRecentLogin } from './deleteAccount';
+import {
+    cachedLink,
+    createShoppingLink,
+    DELIVERY_REQUIRES_PRO,
+    DeliveryRequest,
+    hasNearbyRetailer,
+    InstacartError,
+    LINK_MS,
+    LinkState,
+    nextWindow,
+    parseDeliveryRequest,
+} from './delivery';
 import { planUpdates, RevenueCatEvent, secretMatches, SubscriptionUpdate } from './revenuecat';
 
 initializeApp();
@@ -13,6 +26,12 @@ const db = getFirestore();
 const WEBHOOK_SECRET = defineSecret('REVENUECAT_WEBHOOK_SECRET');
 /** RevenueCat entitlement identifier that means "Pro" (matches the app's EXPO_PUBLIC_REVENUECAT_ENTITLEMENT_ID). */
 const ENTITLEMENT = defineString('REVENUECAT_ENTITLEMENT_ID', { default: 'pro' });
+/** Instacart Developer Platform key, issued after Instacart approves the app. */
+const INSTACART_KEY = defineSecret('INSTACART_API_KEY');
+/** connect.dev.instacart.tools for a development key, connect.instacart.com for production. */
+const INSTACART_URL = defineString('INSTACART_API_URL');
+/** Off until Instacart has approved the integration (functions/.env). */
+const DELIVERY_ENABLED = defineBoolean('DELIVERY_ENABLED', { default: false });
 
 /**
  * Records Pro status at subscriptions/{uid} and mirrors it onto the user's
@@ -92,5 +111,63 @@ export const deleteAccount = onCall({ region: 'europe-west1', maxInstances: 5 },
     } catch (e) {
         logger.error('Account deletion failed', { uid, error: (e as Error).message });
         throw new HttpsError('internal', 'Your account could not be deleted. Please try again.');
+    }
+});
+
+async function isSubscribed(uid: string): Promise<boolean> {
+    const sub = await db.doc(`subscriptions/${uid}`).get();
+    if (sub.get('isPro') !== true) return false;
+    const expires = sub.get('expiresAt') as Timestamp | null | undefined;
+    return !expires || expires.toMillis() > Date.now();
+}
+
+const hashRequest = ({ country, postalCode, items }: DeliveryRequest) => createHash('sha256').update(JSON.stringify([country, postalCode, items])).digest('hex');
+
+/**
+ * Turns a shopping list into an Instacart page and returns its URL. The API
+ * key stays here; the app only ever sees the URL. deliveryLinks/{uid} holds
+ * the last link (Instacart asks partners to reuse them) and the hourly count,
+ * and no client can read it.
+ */
+export const createDeliveryLink = onCall({ region: 'europe-west1', secrets: [INSTACART_KEY], maxInstances: 5 }, async request => {
+    const uid = request.auth?.uid;
+    if (!uid) throw new HttpsError('unauthenticated', 'Sign in to send your list.');
+    if (!DELIVERY_ENABLED.value()) throw new HttpsError('failed-precondition', 'Delivery is not available yet.');
+
+    let input: DeliveryRequest;
+    try {
+        input = parseDeliveryRequest(request.data);
+    } catch (e) {
+        throw new HttpsError('invalid-argument', (e as Error).message);
+    }
+    if (DELIVERY_REQUIRES_PRO && !(await isSubscribed(uid))) throw new HttpsError('permission-denied', 'Delivery is a Pro feature.');
+
+    const hash = hashRequest(input);
+    const ref = db.doc(`deliveryLinks/${uid}`);
+    const now = Date.now();
+    const cached = await db.runTransaction(async tx => {
+        const state = (await tx.get(ref)).data() as LinkState | undefined;
+        const url = cachedLink(state, hash, now);
+        if (url) return url;
+        const window = nextWindow(state, now);
+        if (!window) throw new HttpsError('resource-exhausted', 'Too many lists sent. Try again in an hour.');
+        tx.set(ref, window, { merge: true });
+        return null;
+    });
+    if (cached) return { url: cached };
+
+    try {
+        const baseUrl = INSTACART_URL.value();
+        const key = INSTACART_KEY.value();
+        if (!(await hasNearbyRetailer(fetch, baseUrl, key, input.country, input.postalCode))) {
+            throw new HttpsError('not-found', 'Instacart has no stores for that postal code yet.');
+        }
+        const url = await createShoppingLink(fetch, baseUrl, key, input.items);
+        await ref.set({ hash, url, expiresAtMs: now + LINK_MS }, { merge: true });
+        return { url };
+    } catch (e) {
+        if (e instanceof HttpsError) throw e;
+        logger.error('Instacart request failed', { uid, status: e instanceof InstacartError ? e.status : null, error: (e as Error).message });
+        throw new HttpsError('unavailable', "Instacart can't be reached right now. Please try again.");
     }
 });

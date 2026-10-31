@@ -17,6 +17,8 @@ export const DEFAULT_PREFS: UserPreferences = {
     liveHintDismissed: false,
     expiryAlerts: false,
     expiryAlertDays: EXPIRY_ALERT_DEFAULT_DAYS,
+    country: null,
+    postalCode: null,
 };
 
 export const DIETARY_OPTIONS = ['vegetarian', 'vegan', 'pescatarian', 'gluten-free', 'dairy-free'];

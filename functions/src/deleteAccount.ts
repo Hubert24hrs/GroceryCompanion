@@ -47,6 +47,7 @@ export async function deleteAccountData(db: Firestore, uid: string): Promise<Del
 
     await db.recursiveDelete(db.doc(`users/${uid}`));
     await db.doc(`subscriptions/${uid}`).delete();
+    await db.doc(`deliveryLinks/${uid}`).delete();
     await getAuth().deleteUser(uid);
     return summary;
 }

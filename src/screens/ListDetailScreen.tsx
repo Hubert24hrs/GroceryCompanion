@@ -5,8 +5,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootScreenProps } from '../navigation/navigation';
 import { addLowStockToList, clearChecked, deleteList, finishTrip, restoreItem, toggleItem, uncheckAll } from '../data/repo';
 import { CATEGORIES, compareCategories } from '../domain/categories';
+import { itemsForDelivery, resolveCountry } from '../domain/delivery';
+import { hasFeature } from '../domain/entitlements';
 import { Category, ListItem } from '../domain/types';
 import { canEdit } from '../domain/validation';
+import { deliveryProviderFor } from '../services/delivery';
+import { deviceRegion } from '../services/region';
 import { useRecord, useTable } from '../state/hooks';
 import { formatMoney, usePrefs } from '../state/prefs';
 import { useIsPro, useLiveSync, useSession } from '../state/session';
@@ -16,6 +20,7 @@ import { Button, Card, EmptyState, IconButton, ProgressBar, tap, Text } from '..
 import { layout, useSyncRefreshControl } from '../ui/Screen';
 import { ActionItem, ActionSheet, ConfirmSheet, Sheet } from '../ui/Sheet';
 import { radius, spacing, useTheme } from '../ui/theme';
+import { DeliverySheet } from './list/DeliverySheet';
 import { EditItemSheet } from './list/EditItemSheet';
 import { ItemRow } from './list/ItemRow';
 import { QuickAddBar } from './list/QuickAddBar';
@@ -45,11 +50,14 @@ export function ListDetailScreen({ route, navigation }: RootScreenProps<'ListDet
     const liveHintDismissed = usePrefs(s => s.prefs.liveHintDismissed);
     const updatePrefs = usePrefs(s => s.update);
     useLiveList(listId, liveSync);
+    const country = resolveCountry(usePrefs(s => s.prefs.country), deviceRegion());
+    const delivery = deliveryProviderFor(country);
 
     const [editing, setEditing] = useState<ListItem | null>(null);
     const [menuOpen, setMenuOpen] = useState(false);
     const [formOpen, setFormOpen] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
+    const [deliveryOpen, setDeliveryOpen] = useState(false);
     const [finishing, setFinishing] = useState(false);
     // Frozen when the sheet opens, so it doesn't flash "0 items" while closing after the trip is saved.
     const [trip, setTrip] = useState({ count: 0, total: 0, remaining: 0 });
@@ -114,6 +122,13 @@ export function ListDetailScreen({ route, navigation }: RootScreenProps<'ListDet
                 ),
         },
     ];
+    if (delivery) {
+        menu.push({
+            label: delivery.label,
+            icon: 'bag-handle-outline',
+            onPress: () => (hasFeature(isPro, 'delivery') ? setDeliveryOpen(true) : navigation.navigate('Pro')),
+        });
+    }
     if (checked.length) {
         menu.push(
             { label: 'Uncheck all', icon: 'refresh', onPress: () => void uncheckAll(listId).catch(toastError) },
@@ -248,6 +263,9 @@ export function ListDetailScreen({ route, navigation }: RootScreenProps<'ListDet
                 </View>
             ) : null}
 
+            {delivery && country ? (
+                <DeliverySheet visible={deliveryOpen} onClose={() => setDeliveryOpen(false)} provider={delivery} country={country} items={itemsForDelivery(items)} />
+            ) : null}
             <EditItemSheet item={editing} onClose={() => setEditing(null)} />
             <ActionSheet visible={menuOpen} onClose={() => setMenuOpen(false)} title={list.name} actions={menu} />
             <ListFormSheet visible={formOpen} onClose={() => setFormOpen(false)} list={list} />

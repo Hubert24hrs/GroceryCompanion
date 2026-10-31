@@ -1,6 +1,8 @@
 import { consolidateIngredients, itemsToBuy } from '../aggregate';
 import { autoCategorize } from '../categories';
-import { canLiveSync, FEATURE_ACCESS, hasFeature } from '../entitlements';
+import * as serverDelivery from '../../../functions/src/delivery';
+import { DeliveryProvider, isValidPostalCode, itemsForDelivery, providerFor, resolveCountry } from '../delivery';
+import { canLiveSync, DELIVERY_COUNTRIES, DELIVERY_MODE, FEATURE_ACCESS, hasFeature } from '../entitlements';
 import { planExpiryAlerts } from '../expiryAlerts';
 import { defaultPantryLocation, expiryStatus, isLowStock, itemKey } from '../pantry';
 import { parseItems, parseNumber } from '../parsing';
@@ -198,5 +200,49 @@ describe('expiry alerts', () => {
         expect(planExpiryAlerts(items, '2026-11-01', 2, 12)).toEqual([
             { date: '2026-11-08', title: '4 pantry items expire soon', body: 'Eggs, Ham, Kale and 1 more. The first expires in 2 days.' },
         ]);
+    });
+});
+
+describe('delivery', () => {
+    const provider = { id: 'instacart', supportedCountries: DELIVERY_COUNTRIES } as DeliveryProvider;
+
+    test('is off unless a build turns it on', () => {
+        expect(DELIVERY_MODE).toBe('off');
+        expect(providerFor([provider], 'off', 'US')).toBeNull();
+    });
+
+    test('shows in the US and Canada, and nowhere else', () => {
+        expect(providerFor([provider], 'live', 'US')).toBe(provider);
+        expect(providerFor([provider], 'mock', 'CA')).toBe(provider);
+        for (const country of ['NG', 'GB', 'DE', 'FR', 'OTHER', null]) expect(providerFor([provider], 'live', country)).toBeNull();
+    });
+
+    test('the Settings choice beats the phone region', () => {
+        expect(resolveCountry(null, 'US')).toBe('US');
+        expect(resolveCountry('OTHER', 'US')).toBe('OTHER');
+        expect(resolveCountry('CA', 'NG')).toBe('CA');
+        expect(resolveCountry(null, null)).toBeNull();
+    });
+
+    test('validates postal codes per country', () => {
+        for (const ok of ['94105', '94105-1234']) expect(isValidPostalCode('US', ok)).toBe(true);
+        for (const ok of ['K1A 0B1', 'k1a0b1', 'K1A-0B1', ' K1A 0B1 ']) expect(isValidPostalCode('CA', ok)).toBe(true);
+        for (const bad of ['9410', '941055', '94105-12', 'K1A 0B1', '']) expect(isValidPostalCode('US', bad)).toBe(false);
+        for (const bad of ['94105', 'K1A0B', 'KKA 0B1', '']) expect(isValidPostalCode('CA', bad)).toBe(false);
+        expect(isValidPostalCode('NG', '100001')).toBe(false);
+    });
+
+    test('the app and the server agree', () => {
+        expect(serverDelivery.DELIVERY_COUNTRIES).toEqual(DELIVERY_COUNTRIES);
+        expect(serverDelivery.DELIVERY_REQUIRES_PRO).toBe(FEATURE_ACCESS.delivery === 'pro');
+        for (const code of ['94105', '94105-1234', 'K1A 0B1', 'k1a0b1', '9410', 'nope']) {
+            for (const country of ['US', 'CA', 'NG']) expect(serverDelivery.isValidPostalCode(country, code)).toBe(isValidPostalCode(country, code));
+        }
+    });
+
+    test('sends only what is left to buy, and only its name and amount', () => {
+        const base = { id: 'x', name: 'Milk', quantity: 2, unit: 'l', isChecked: false, deletedAt: null, notes: 'For Sam', householdId: 'h' };
+        const items = [base, { ...base, name: 'Eggs', isChecked: true }, { ...base, name: 'Ham', deletedAt: 'now' }] as ListItem[];
+        expect(itemsForDelivery(items)).toEqual([{ name: 'Milk', quantity: 2, unit: 'l' }]);
     });
 });
