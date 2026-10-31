@@ -1,16 +1,16 @@
 {
   "expo": {
-    "name": "GroceryCompanion",
+    "name": "Grocery Companion",
     "slug": "GroceryCompanion",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#2E7D4B"
     },
     "ios": {
       "supportsTablet": true,
@@ -22,7 +22,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#2E7D4B"
       },
       "package": "com.hubert24hrs.grocerycompanion",
       "permissions": [
@@ -30,7 +30,15 @@
         "android.permission.INTERNET"
       ],
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -42,31 +50,35 @@
       "web"
     ],
     "plugins": [
-      "react-native-google-mobile-ads",
       [
         "expo-build-properties",
         {
-          "android": {
-            "compileSdkVersion": 34,
-            "targetSdkVersion": 34,
-            "buildToolsVersion": "34.0.0"
-          },
           "ios": {
-            "deploymentTarget": "13.4"
+            "deploymentTarget": "15.1"
           }
         }
       ],
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow GroceryCompanion to access your camera."
+          "cameraPermission": "Allow Grocery Companion to access your camera.",
+          "recordAudioAndroid": false
+        }
+      ],
+      "expo-font",
+      "expo-localization",
+      [
+        "expo-notifications",
+        {
+          "color": "#2E7D4B"
         }
       ]
     ],
     "extra": {
       "eas": {
-        "projectId": "your-project-id"
+        "projectId": "ac282486-80df-482d-a161-72931cfe7c1b"
       }
-    }
+    },
+    "owner": "hubert24hrs"
   }
 }

@@ -1,189 +1,414 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Alert, ScrollView, Switch, TouchableOpacity } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../utils/constants';
-import { Button } from '../components/common/Button';
-import { useUserStore } from '../store/useUserStore';
-import { syncEngine } from '../services/sync/syncEngine';
+import { Ionicons } from '@expo/vector-icons';
+import React, { useEffect, useState } from 'react';
+import { Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import appConfig from '../../app.json';
+import { RootScreenProps } from '../navigation/navigation';
+import { relativeTime } from '../domain/dates';
+import { UserPreferences } from '../domain/types';
+import { parseMoney } from '../domain/validation';
+import { OTHER_COUNTRY } from '../domain/delivery';
+import { DELIVERY_COUNTRIES, DELIVERY_MODE, EXPIRY_ALERT_DAY_OPTIONS, hasFeature } from '../domain/entitlements';
+import { isBackendConfigured } from '../services/firebase';
+import { notificationsAvailable } from '../services/notifications';
+import { deviceRegion } from '../services/region';
+import { enableExpiryAlerts } from '../state/expiryAlerts';
+import { DIETARY_OPTIONS, formatMoney, usePrefs } from '../state/prefs';
+import { useIsPro, useSession } from '../state/session';
+import { syncController, useSyncState } from '../state/sync';
+import { toast, toastError } from '../state/toast';
+import { Banner, Button, Card, Chip, Field, IconButton, IconName, Text } from '../ui/primitives';
+import { layout } from '../ui/Screen';
+import { ConfirmSheet } from '../ui/Sheet';
+import { radius, spacing, useTheme } from '../ui/theme';
+import { AuthMode, AuthSheet } from './settings/AuthSheet';
+import { DeleteAccountSheet } from './settings/DeleteAccountSheet';
 
-export function SettingsScreen() {
-    const { user, signOut } = useUserStore();
-    const [syncing, setSyncing] = useState(false);
+const PRIVACY_URL = 'https://grocery-companion-hub.web.app/privacy';
 
-    const handleSignOut = async () => {
-        Alert.alert(
-            'Sign Out',
-            'Are you sure you want to sign out?',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Sign Out',
-                    style: 'destructive',
-                    onPress: async () => {
-                        await signOut();
-                        // Navigation handled by AppNavigator
-                    }
-                },
-            ]
-        );
-    };
+const COUNTRY_NAMES: Record<string, string> = { US: 'United States', CA: 'Canada', [OTHER_COUNTRY]: 'Other' };
 
-    const handleManualSync = async () => {
-        setSyncing(true);
-        try {
-            await syncEngine.processQueue();
-            await syncEngine.pullRemoteChanges();
-            Alert.alert('Success', 'Sync completed successfully');
-        } catch (error) {
-            Alert.alert('Sync Failed', (error as Error).message);
-        } finally {
-            setSyncing(false);
+const THEMES: { key: UserPreferences['theme']; label: string; icon: IconName }[] = [
+    { key: 'system', label: 'Automatic', icon: 'phone-portrait-outline' },
+    { key: 'light', label: 'Light', icon: 'sunny-outline' },
+    { key: 'dark', label: 'Dark', icon: 'moon-outline' },
+];
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+    return (
+        <View style={{ gap: spacing.sm }}>
+            <Text variant="label" muted style={styles.sectionTitle}>
+                {title.toUpperCase()}
+            </Text>
+            {children}
+        </View>
+    );
+}
+
+function Row({ icon, label, detail, onPress, right, tint }: {
+    icon: IconName;
+    label: string;
+    detail?: string | null;
+    onPress?: () => void;
+    right?: React.ReactNode;
+    tint?: string;
+}) {
+    const { colors } = useTheme();
+    const body = (
+        <>
+            <View style={[styles.rowIcon, { backgroundColor: (tint ?? colors.primary) + '1F' }]}>
+                <Ionicons name={icon} size={18} color={tint ?? colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+                <Text>{label}</Text>
+                {detail ? (
+                    <Text variant="caption" muted>
+                        {detail}
+                    </Text>
+                ) : null}
+            </View>
+            {right ?? (onPress ? <Ionicons name="chevron-forward" size={18} color={colors.textMuted} /> : null)}
+        </>
+    );
+    if (!onPress) return <View style={styles.row}>{body}</View>;
+    return (
+        <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}>
+            {body}
+        </Pressable>
+    );
+}
+
+function SyncDetails() {
+    const { colors } = useTheme();
+    const sync = useSyncState();
+    const [retrying, setRetrying] = useState(false);
+    const engine = syncController.engine;
+    const status =
+        sync.status === 'syncing'
+            ? 'Syncing…'
+            : sync.status === 'offline'
+              ? 'Offline. Changes are saved here and will upload later.'
+              : sync.status === 'error'
+                ? `Sync stopped: ${sync.lastError ?? 'unknown error'}`
+                : sync.lastSyncedAt
+                  ? `Up to date · ${relativeTime(sync.lastSyncedAt)}`
+                  : 'Waiting to sync';
+    return (
+        <>
+            <Row
+                icon={sync.status === 'error' || sync.failed.length ? 'warning-outline' : 'cloud-done-outline'}
+                tint={sync.status === 'error' || sync.failed.length ? colors.warning : undefined}
+                label="Sync"
+                detail={`${status}${sync.pending ? ` · ${sync.pending} change${sync.pending === 1 ? '' : 's'} waiting` : ''}`}
+                right={
+                    <IconButton
+                        icon="refresh"
+                        label="Sync now"
+                        onPress={() => void engine?.syncNow()}
+                        disabled={sync.status === 'syncing' || !engine}
+                        color={colors.primary}
+                    />
+                }
+            />
+            {sync.failed.length ? (
+                <View style={{ gap: spacing.sm }}>
+                    <Banner
+                        tone="warning"
+                        message={`${sync.failed.length} change${sync.failed.length === 1 ? '' : 's'} couldn't be uploaded after several tries${sync.failed[0].lastError ? ` (${sync.failed[0].lastError})` : ''}.`}
+                    />
+                    <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                        <Button
+                            title="Try again"
+                            small
+                            loading={retrying}
+                            style={{ flex: 1 }}
+                            onPress={async () => {
+                                setRetrying(true);
+                                await engine?.retryFailed().catch(toastError);
+                                setRetrying(false);
+                            }}
+                        />
+                        <Button
+                            title="Use server copy"
+                            small
+                            variant="secondary"
+                            style={{ flex: 1 }}
+                            onPress={async () => {
+                                for (const f of sync.failed) await engine?.discardFailed(f);
+                                void engine?.syncNow();
+                                toast('Discarded the stuck changes. Pulling the latest from your household.', { tone: 'info' });
+                            }}
+                        />
+                    </View>
+                </View>
+            ) : null}
+        </>
+    );
+}
+
+export function SettingsScreen({ navigation }: RootScreenProps<'Settings'>) {
+    const { colors } = useTheme();
+    const insets = useSafeAreaInsets();
+    const prefs = usePrefs(s => s.prefs);
+    const update = usePrefs(s => s.update);
+    const user = useSession(s => s.user);
+    const linking = useSession(s => s.linking);
+    const householdName = useSession(s => s.householdName);
+    const members = useSession(s => s.members);
+    const role = useSession(s => s.role);
+    const isPro = useIsPro();
+    const alertsAllowed = hasFeature(isPro, 'pantryAlerts');
+    const [auth, setAuth] = useState<AuthMode | null>(null);
+    const [confirmSignOut, setConfirmSignOut] = useState(false);
+    const [deleteOpen, setDeleteOpen] = useState(false);
+    const [budget, setBudget] = useState(prefs.monthlyBudget != null ? String(prefs.monthlyBudget) : '');
+    const [budgetError, setBudgetError] = useState<string | null>(null);
+
+    useEffect(() => setBudget(prefs.monthlyBudget != null ? String(prefs.monthlyBudget) : ''), [prefs.monthlyBudget]);
+
+    const save = (patch: Partial<UserPreferences>) => void update(patch).catch(toastError);
+
+    const saveBudget = () => {
+        const b = parseMoney(budget, 'Budget');
+        if (!b.ok) {
+            setBudgetError(b.error);
+            return;
+        }
+        setBudgetError(null);
+        if (b.value !== prefs.monthlyBudget) {
+            save({ monthlyBudget: b.value });
+            toast(b.value ? `Monthly budget set to ${formatMoney(b.value)}.` : 'Monthly budget removed.', { tone: 'success' });
         }
     };
 
-    return (
-        <SafeAreaView style={styles.container} edges={['bottom']}>
-            <ScrollView contentContainerStyle={styles.content}>
+    const toggleExpiryAlerts = (on: boolean) => {
+        if (!alertsAllowed) navigation.navigate('Pro');
+        else if (on) void enableExpiryAlerts().catch(toastError);
+        else save({ expiryAlerts: false });
+    };
 
-                {/* Profile Section */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Account</Text>
-                    <View style={styles.card}>
-                        <View style={styles.row}>
-                            <Text style={styles.label}>Email</Text>
-                            <Text style={styles.value}>{user?.email || 'Guest User'}</Text>
+    const toggleDiet = (d: string) =>
+        save({ dietary: prefs.dietary.includes(d) ? prefs.dietary.filter(x => x !== d) : [...prefs.dietary, d] });
+
+    return (
+        <View style={[styles.root, { backgroundColor: colors.background }]}>
+            <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xxl }]} keyboardShouldPersistTaps="handled">
+                <Section title="Account">
+                    <Card style={styles.card}>
+                        {!isBackendConfigured ? (
+                            <Row
+                                icon="phone-portrait-outline"
+                                label="Saved on this device"
+                                detail="Accounts and sharing aren't set up in this build, so everything stays on this device."
+                            />
+                        ) : !user ? (
+                            <View style={{ gap: spacing.md, padding: spacing.md }}>
+                                <Text variant="subheading">Sync and share</Text>
+                                <Text variant="caption" muted>
+                                    Sign in to keep your lists on all your devices and shop together with your household. Everything you’ve added
+                                    so far comes with you.
+                                </Text>
+                                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                                    <Button title="Sign in" onPress={() => setAuth('signin')} style={{ flex: 1 }} />
+                                    <Button title="Create account" variant="secondary" onPress={() => setAuth('signup')} style={{ flex: 1 }} />
+                                </View>
+                            </View>
+                        ) : (
+                            <>
+                                <Row icon="person-circle-outline" label={user.email ?? 'Signed in'} detail={linking ? 'Connecting your household…' : 'Signed in'} />
+                                <SyncDetails />
+                                <Row icon="log-out-outline" label="Sign out" tint={colors.danger} onPress={() => setConfirmSignOut(true)} />
+                            </>
+                        )}
+                    </Card>
+                </Section>
+
+                <Section title="Household">
+                    <Card style={styles.card}>
+                        <Row
+                            icon="people-outline"
+                            label={user ? householdName : 'Household sharing'}
+                            detail={
+                                user
+                                    ? `${members.length || 1} member${members.length === 1 ? '' : 's'} · you're ${role === 'owner' ? 'the owner' : `an ${role}`}`
+                                    : 'Invite family or housemates to the same lists'
+                            }
+                            onPress={() => navigation.navigate('Household')}
+                        />
+                    </Card>
+                </Section>
+
+                <Section title="Plan">
+                    <Card style={styles.card}>
+                        <Row
+                            icon="sparkles-outline"
+                            tint={colors.accent}
+                            label={isPro ? 'Grocery Companion Pro' : 'Free plan'}
+                            detail={isPro ? 'Thanks for supporting the app!' : 'Unlimited lists and recipes, smart meal ideas, full spending history'}
+                            onPress={() => navigation.navigate('Pro')}
+                        />
+                    </Card>
+                </Section>
+
+                <Section title="Preferences">
+                    <Card style={[styles.card, { gap: spacing.lg, padding: spacing.lg }]}>
+                        <View style={styles.inline}>
+                            <View style={{ flex: 1 }}>
+                                <Text>People you cook for</Text>
+                                <Text variant="caption" muted>
+                                    Sets default servings when you plan meals.
+                                </Text>
+                            </View>
+                            <View style={[styles.stepper, { backgroundColor: colors.surfaceAlt }]}>
+                                <IconButton
+                                    icon="remove"
+                                    size={18}
+                                    label="Fewer people"
+                                    disabled={prefs.householdSize <= 1}
+                                    onPress={() => save({ householdSize: Math.max(1, prefs.householdSize - 1) })}
+                                />
+                                <Text variant="label" style={{ minWidth: 20, textAlign: 'center' }}>
+                                    {prefs.householdSize}
+                                </Text>
+                                <IconButton icon="add" size={18} label="More people" onPress={() => save({ householdSize: Math.min(20, prefs.householdSize + 1) })} />
+                            </View>
                         </View>
-                        <View style={styles.divider} />
-                        <View style={styles.row}>
-                            <Text style={styles.label}>User ID</Text>
-                            <Text style={styles.value} numberOfLines={1} ellipsizeMode="middle">
-                                {user?.id || 'Anonymous'}
+                        <View style={{ gap: spacing.sm }}>
+                            <Text>Diet</Text>
+                            <Text variant="caption" muted>
+                                Meal ideas skip recipes that don’t fit.
+                            </Text>
+                            <View style={styles.chips}>
+                                {DIETARY_OPTIONS.map(d => (
+                                    <Chip key={d} label={d[0].toUpperCase() + d.slice(1).replace(/-/g, ' ')} selected={prefs.dietary.includes(d)} onPress={() => toggleDiet(d)} />
+                                ))}
+                            </View>
+                        </View>
+                        <View style={{ gap: spacing.sm }}>
+                            <Field
+                                label={`Monthly grocery budget (${prefs.currency})`}
+                                value={budget}
+                                onChangeText={setBudget}
+                                onBlur={saveBudget}
+                                onSubmitEditing={saveBudget}
+                                placeholder="No budget"
+                                keyboardType="decimal-pad"
+                                returnKeyType="done"
+                                error={budgetError}
+                            />
+                            <Text variant="caption" muted>
+                                Prices show in {prefs.currency} ({formatMoney(12.5)}), the currency of your phone’s region.
                             </Text>
                         </View>
-                    </View>
-                </View>
+                    </Card>
+                </Section>
 
-                {/* Sync Section */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Data & Sync</Text>
-                    <View style={styles.card}>
-                        <View style={styles.row}>
-                            <View>
-                                <Text style={styles.itemTitle}>Sync Status</Text>
-                                <Text style={styles.itemSubtitle}>Last synced: Just now</Text>
+                <Section title="App">
+                    <Card style={[styles.card, { gap: spacing.lg, padding: spacing.lg }]}>
+                        <View style={{ gap: spacing.sm }}>
+                            <Text>Appearance</Text>
+                            <View style={styles.chips}>
+                                {THEMES.map(t => (
+                                    <Chip key={t.key} label={t.label} icon={t.icon} selected={prefs.theme === t.key} onPress={() => save({ theme: t.key })} />
+                                ))}
                             </View>
-                            <Button
-                                title="Sync Now"
-                                size="small"
-                                variant="outline"
-                                loading={syncing}
-                                onPress={handleManualSync}
-                            />
                         </View>
-                    </View>
-                    <Text style={styles.hint}>
-                        Data automatically syncs when you're online.
-                    </Text>
-                </View>
+                        {DELIVERY_MODE !== 'off' ? (
+                            <View style={{ gap: spacing.sm }}>
+                                <Text>Country for delivery</Text>
+                                <View style={styles.chips}>
+                                    <Chip label={`Automatic${deviceRegion() ? ` (${deviceRegion()})` : ''}`} selected={prefs.country === null} onPress={() => save({ country: null })} />
+                                    {[...DELIVERY_COUNTRIES, OTHER_COUNTRY].map(c => (
+                                        <Chip key={c} label={COUNTRY_NAMES[c] ?? c} selected={prefs.country === c} onPress={() => save({ country: c })} />
+                                    ))}
+                                </View>
+                            </View>
+                        ) : null}
+                        {notificationsAvailable ? (
+                            <View style={{ gap: spacing.sm }}>
+                                <View style={styles.inline}>
+                                    <View style={{ flex: 1 }}>
+                                        <Text>Expiry alerts</Text>
+                                        <Text variant="caption" muted>
+                                            A reminder on this phone before pantry items expire.{alertsAllowed ? '' : ' Pro feature.'}
+                                        </Text>
+                                    </View>
+                                    <Switch
+                                        value={prefs.expiryAlerts && alertsAllowed}
+                                        onValueChange={toggleExpiryAlerts}
+                                        trackColor={{ true: colors.primary, false: colors.border }}
+                                        accessibilityLabel="Expiry alerts"
+                                    />
+                                </View>
+                                {prefs.expiryAlerts && alertsAllowed ? (
+                                    <View style={styles.chips}>
+                                        {EXPIRY_ALERT_DAY_OPTIONS.map(d => (
+                                            <Chip key={d} label={d === 1 ? '1 day before' : `${d} days before`} selected={prefs.expiryAlertDays === d} onPress={() => save({ expiryAlertDays: d })} />
+                                        ))}
+                                    </View>
+                                ) : null}
+                            </View>
+                        ) : null}
+                        {Platform.OS !== 'web' ? (
+                            <View style={styles.inline}>
+                                <Text style={{ flex: 1 }}>Vibrate on taps</Text>
+                                <Switch
+                                    value={prefs.haptics}
+                                    onValueChange={v => save({ haptics: v })}
+                                    trackColor={{ true: colors.primary, false: colors.border }}
+                                    accessibilityLabel="Vibrate on taps"
+                                />
+                            </View>
+                        ) : null}
+                    </Card>
+                    <Card style={styles.card}>
+                        <Row icon="shield-checkmark-outline" label="Privacy policy" onPress={() => void Linking.openURL(PRIVACY_URL).catch(toastError)} />
+                    </Card>
+                </Section>
 
-                {/* Preferences Section (Placeholder) */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Preferences</Text>
-                    <View style={styles.card}>
-                        <View style={styles.row}>
-                            <Text style={styles.itemTitle}>Haptic Feedback</Text>
-                            <Switch value={true} onValueChange={() => { }} trackColor={{ true: COLORS.primary }} />
-                        </View>
-                        <View style={styles.divider} />
-                        <View style={styles.row}>
-                            <Text style={styles.itemTitle}>Dark Mode</Text>
-                            <Switch value={false} onValueChange={() => { }} trackColor={{ true: COLORS.primary }} />
-                        </View>
-                    </View>
-                </View>
+                <Text variant="caption" muted style={{ textAlign: 'center' }}>
+                    Grocery Companion {appConfig.expo.version}
+                </Text>
 
-                <Button
-                    title="Sign Out"
-                    variant="ghost"
-                    style={styles.signOutButton}
-                    onPress={handleSignOut}
-                />
-
-                <Text style={styles.version}>Version 1.0.0 (Build 1)</Text>
+                {/* Last item on purpose: the stores require in-app account deletion. */}
+                <Card style={styles.card}>
+                    <Row
+                        icon="trash-outline"
+                        tint={colors.danger}
+                        label={user ? 'Delete account' : 'Delete data on this device'}
+                        detail={user ? 'Permanently delete your account and its data' : 'Remove all lists, pantry, recipes and plans from this device'}
+                        onPress={() => setDeleteOpen(true)}
+                    />
+                </Card>
             </ScrollView>
-        </SafeAreaView>
+
+            <DeleteAccountSheet visible={deleteOpen} onClose={() => setDeleteOpen(false)} />
+            <AuthSheet mode={auth} onClose={() => setAuth(null)} />
+            <ConfirmSheet
+                visible={confirmSignOut}
+                onClose={() => setConfirmSignOut(false)}
+                title="Sign out?"
+                message="Your household's data stays in your account. This device goes back to an empty, offline copy until you sign in again."
+                confirmLabel="Sign out"
+                onConfirm={() =>
+                    useSession
+                        .getState()
+                        .signOut()
+                        .then(() => toast('Signed out.', { tone: 'info' }), toastError)
+                }
+            />
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: COLORS.background,
-    },
-    content: {
-        padding: SPACING.lg,
-    },
-    section: {
-        marginBottom: SPACING.xl,
-    },
-    sectionTitle: {
-        fontSize: FONT_SIZES.md,
-        fontWeight: '600',
-        color: COLORS.textSecondary,
-        marginBottom: SPACING.sm,
-        marginLeft: SPACING.xs,
-        textTransform: 'uppercase',
-    },
-    card: {
-        backgroundColor: COLORS.surface,
-        borderRadius: BORDER_RADIUS.lg,
-        overflow: 'hidden',
-    },
-    row: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: SPACING.md,
-        minHeight: 56,
-    },
-    divider: {
-        height: 1,
-        backgroundColor: COLORS.divider,
-        marginLeft: SPACING.md,
-    },
-    label: {
-        fontSize: FONT_SIZES.md,
-        color: COLORS.text,
-    },
-    value: {
-        fontSize: FONT_SIZES.md,
-        color: COLORS.textSecondary,
-        maxWidth: '60%',
-    },
-    itemTitle: {
-        fontSize: FONT_SIZES.md,
-        color: COLORS.text,
-        fontWeight: '500',
-    },
-    itemSubtitle: {
-        fontSize: FONT_SIZES.sm,
-        color: COLORS.textSecondary,
-        marginTop: 2,
-    },
-    hint: {
-        fontSize: FONT_SIZES.xs,
-        color: COLORS.textSecondary,
-        marginTop: SPACING.sm,
-        marginLeft: SPACING.xs,
-    },
-    signOutButton: {
-        marginTop: SPACING.lg,
-    },
-    version: {
-        textAlign: 'center',
-        color: COLORS.textLight,
-        fontSize: FONT_SIZES.sm,
-        marginTop: SPACING.xl,
-        marginBottom: SPACING.xl,
-    },
+    root: { flex: 1 },
+    content: { padding: spacing.lg, gap: spacing.xl, ...layout.page },
+    sectionTitle: { fontSize: 12, letterSpacing: 0.6, marginLeft: spacing.xs },
+    card: { padding: spacing.xs },
+    row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, minHeight: 56 },
+    rowIcon: { width: 34, height: 34, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
+    inline: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+    stepper: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill },
+    chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
 });

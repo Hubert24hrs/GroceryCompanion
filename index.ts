@@ -1,3 +1,5 @@
+// uuid needs crypto.getRandomValues, which React Native lacks; must load first.
+import 'react-native-get-random-values';
 import { registerRootComponent } from 'expo';
 
 import App from './App';
