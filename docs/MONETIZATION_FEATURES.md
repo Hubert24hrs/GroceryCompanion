@@ -52,8 +52,11 @@ while Pro households keep them until they update.
 
 ### Turning Instacart on
 
-1. Apply at https://www.instacart.com/company/business/developers. Instacart quotes 30 to 40
-   days from request to production key.
+**Blocked as of 2026-10-31:** Instacart's page says it is not accepting new applications and has
+no waitlist, so these steps can't start yet. Delivery stays off until applications reopen.
+
+1. Apply at https://www.instacart.com/company/business/developers once applications reopen.
+   Instacart quotes 30 to 40 days from request to production key.
 2. Get the logo from Instacart and add it to `DeliverySheet.tsx`. Its button guidelines call for
    it, and logo use needs its marketing team's approval.
 3. Create a development key in the Instacart dashboard and set it as `INSTACART_API_KEY`.
