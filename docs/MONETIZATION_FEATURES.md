@@ -20,7 +20,7 @@ as the second device and a sandbox subscription.
 | Expiry reminder scheduled at 9 am, 2 days before; channel created | Passed |
 | A reminder actually appearing at 9 am | Not seen: it needs the phone to reach that time |
 | Two people in one household | Rules tests only |
-| Real Instacart API | Not possible: applications are closed |
+| Real Instacart API | Paused: out of scope until Instacart reopens applications |
 | Sign-in prompt before buying | Passed on build 10: Play's sheet never opens |
 | Sandbox Pro expiring back to Free | Passed |
 | Already-owned restore | Not on a device: the sign-in prompt now prevents the usual way to reach it |
@@ -78,8 +78,9 @@ while Pro households keep them until they update.
 
 ### Turning Instacart on
 
-**Blocked as of 2026-10-31:** Instacart's page says it is not accepting new applications and has
-no waitlist, so these steps can't start yet. Delivery stays off until applications reopen.
+**Paused on 2026-10-31.** Instacart's page says it is not accepting new applications and has no
+waitlist, so the integration is on hold until its registration reopens. The code stays in place,
+tested against a fake server only, and is off in the app and on the server. Users see nothing.
 
 1. Apply at https://www.instacart.com/company/business/developers once applications reopen.
    Instacart quotes 30 to 40 days from request to production key.
