@@ -21,7 +21,7 @@ Your pantry is sorted by fridge, freezer and cupboard. Adjust quantities as you 
 RECIPES THAT BECOME SHOPPING LISTS
 Start with a set of ready made recipes or add your own. Scale servings, then send the missing ingredients straight to a list.
 
-GROCERYCOMPANION PRO
+GROCERY COMPANION PRO
 Upgrade for the whole kitchen:
 • Unlimited lists and reusable list templates
 • Weekly meal planner that builds one shopping list
