@@ -13,6 +13,9 @@ import { LookupError, lookupBarcode } from '../services/barcode';
 import { useTable } from '../state/hooks';
 import { useIsPro, useSession } from '../state/session';
 import { toast, toastError } from '../state/toast';
+import { notificationsAvailable } from '../services/notifications';
+import { enableExpiryAlerts } from '../state/expiryAlerts';
+import { usePrefs } from '../state/prefs';
 import { Banner, Button, Card, Chip, EmptyState, Field, IconButton, SectionTitle, Text } from '../ui/primitives';
 import { ProLock } from '../ui/ProLock';
 import { TabScreen } from '../ui/Screen';
@@ -30,6 +33,7 @@ export function PantryScreen({ route, navigation }: TabScreenProps<'Pantry'>) {
     const editable = canEdit(useSession(s => s.role));
     const isPro = useIsPro();
     const alertsAllowed = hasFeature(isPro, 'pantryAlerts');
+    const expiryAlertsOn = usePrefs(s => s.prefs.expiryAlerts);
     const day = today();
 
     const [filter, setFilter] = useState<PantryFilter>('all');
@@ -209,6 +213,15 @@ export function PantryScreen({ route, navigation }: TabScreenProps<'Pantry'>) {
                         </View>
                     ) : null}
 
+                    {alertsAllowed && notificationsAvailable && !expiryAlertsOn && pantry.some(p => p.expiresOn) && !query ? (
+                        <Card style={styles.reminder}>
+                            <Text variant="caption" muted style={{ flex: 1 }}>
+                                Get a reminder on this phone before food expires.
+                            </Text>
+                            <Button title="Turn on" small variant="secondary" onPress={() => void enableExpiryAlerts().catch(toastError)} />
+                        </Card>
+                    ) : null}
+
                     <View style={{ gap: spacing.md }}>
                         <Field value={query} onChangeText={setQuery} placeholder="Search your pantry" accessibilityLabel="Search your pantry" />
                         <View style={styles.chips}>
@@ -254,6 +267,7 @@ export function PantryScreen({ route, navigation }: TabScreenProps<'Pantry'>) {
 
 const styles = StyleSheet.create({
     alerts: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
+    reminder: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
     alert: { flex: 1, minWidth: 220, gap: spacing.sm, borderLeftWidth: 4 },
     chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
     group: { borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },

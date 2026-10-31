@@ -7,7 +7,10 @@ import { RootScreenProps } from '../navigation/navigation';
 import { relativeTime } from '../domain/dates';
 import { UserPreferences } from '../domain/types';
 import { parseMoney } from '../domain/validation';
+import { EXPIRY_ALERT_DAY_OPTIONS, hasFeature } from '../domain/entitlements';
 import { isBackendConfigured } from '../services/firebase';
+import { notificationsAvailable } from '../services/notifications';
+import { enableExpiryAlerts } from '../state/expiryAlerts';
 import { DIETARY_OPTIONS, formatMoney, usePrefs } from '../state/prefs';
 import { useIsPro, useSession } from '../state/session';
 import { syncController, useSyncState } from '../state/sync';
@@ -150,6 +153,7 @@ export function SettingsScreen({ navigation }: RootScreenProps<'Settings'>) {
     const members = useSession(s => s.members);
     const role = useSession(s => s.role);
     const isPro = useIsPro();
+    const alertsAllowed = hasFeature(isPro, 'pantryAlerts');
     const [auth, setAuth] = useState<AuthMode | null>(null);
     const [confirmSignOut, setConfirmSignOut] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
@@ -171,6 +175,12 @@ export function SettingsScreen({ navigation }: RootScreenProps<'Settings'>) {
             save({ monthlyBudget: b.value });
             toast(b.value ? `Monthly budget set to ${formatMoney(b.value)}.` : 'Monthly budget removed.', { tone: 'success' });
         }
+    };
+
+    const toggleExpiryAlerts = (on: boolean) => {
+        if (!alertsAllowed) navigation.navigate('Pro');
+        else if (on) void enableExpiryAlerts().catch(toastError);
+        else save({ expiryAlerts: false });
     };
 
     const toggleDiet = (d: string) =>
@@ -299,6 +309,31 @@ export function SettingsScreen({ navigation }: RootScreenProps<'Settings'>) {
                                 ))}
                             </View>
                         </View>
+                        {notificationsAvailable ? (
+                            <View style={{ gap: spacing.sm }}>
+                                <View style={styles.inline}>
+                                    <View style={{ flex: 1 }}>
+                                        <Text>Expiry alerts</Text>
+                                        <Text variant="caption" muted>
+                                            A reminder on this phone before pantry items expire.{alertsAllowed ? '' : ' Pro feature.'}
+                                        </Text>
+                                    </View>
+                                    <Switch
+                                        value={prefs.expiryAlerts && alertsAllowed}
+                                        onValueChange={toggleExpiryAlerts}
+                                        trackColor={{ true: colors.primary, false: colors.border }}
+                                        accessibilityLabel="Expiry alerts"
+                                    />
+                                </View>
+                                {prefs.expiryAlerts && alertsAllowed ? (
+                                    <View style={styles.chips}>
+                                        {EXPIRY_ALERT_DAY_OPTIONS.map(d => (
+                                            <Chip key={d} label={d === 1 ? '1 day before' : `${d} days before`} selected={prefs.expiryAlertDays === d} onPress={() => save({ expiryAlertDays: d })} />
+                                        ))}
+                                    </View>
+                                ) : null}
+                            </View>
+                        ) : null}
                         {Platform.OS !== 'web' ? (
                             <View style={styles.inline}>
                                 <Text style={{ flex: 1 }}>Vibrate on taps</Text>

@@ -8,6 +8,7 @@ import { NeedStatus } from '../domain/aggregate';
 import { formatQuantity } from '../domain/units';
 import { canEdit } from '../domain/validation';
 import { useRecord, useTable } from '../state/hooks';
+import { hasFeature } from '../domain/entitlements';
 import { useIsPro, useSession } from '../state/session';
 import { toastError } from '../state/toast';
 import { Button, Card, EmptyState, IconButton, IconName, tap, Text } from '../ui/primitives';
@@ -204,7 +205,7 @@ export function RecipeDetailScreen({ route, navigation }: RootScreenProps<'Recip
                                 variant="secondary"
                                 onPress={() => planThis()}
                             />
-                            <Button title="Add ingredients to a list" icon="cart-outline" onPress={() => setAddOpen(true)} style={{ flex: 1 }} />
+                            <Button title="Add ingredients to a list" icon="cart-outline" onPress={() => (hasFeature(isPro, 'recipeToList') ? setAddOpen(true) : navigation.navigate('Pro'))} style={{ flex: 1 }} />
                         </View>
                     </View>
                 </View>

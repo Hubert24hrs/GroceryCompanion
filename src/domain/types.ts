@@ -170,6 +170,8 @@ export interface UserPreferences {
     theme: 'system' | 'light' | 'dark';
     haptics: boolean;
     liveHintDismissed: boolean;
+    expiryAlerts: boolean;
+    expiryAlertDays: number;
 }
 
 export const SYNCED_TABLES = ['lists', 'items', 'pantry_items', 'recipes', 'meal_plan_entries', 'purchases'] as const;

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { EXPIRY_ALERT_DEFAULT_DAYS } from '../domain/entitlements';
 import { UserPreferences } from '../domain/types';
 import { META } from '../data/bootstrap';
 import { getDb } from '../data/db';
@@ -14,6 +15,8 @@ export const DEFAULT_PREFS: UserPreferences = {
     theme: 'system',
     haptics: true,
     liveHintDismissed: false,
+    expiryAlerts: false,
+    expiryAlertDays: EXPIRY_ALERT_DEFAULT_DAYS,
 };
 
 export const DIETARY_OPTIONS = ['vegetarian', 'vegan', 'pescatarian', 'gluten-free', 'dairy-free'];

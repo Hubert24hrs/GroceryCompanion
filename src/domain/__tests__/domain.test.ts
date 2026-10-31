@@ -1,9 +1,10 @@
 import { consolidateIngredients, itemsToBuy } from '../aggregate';
 import { autoCategorize } from '../categories';
 import { canLiveSync, FEATURE_ACCESS, hasFeature } from '../entitlements';
+import { planExpiryAlerts } from '../expiryAlerts';
 import { defaultPantryLocation, expiryStatus, isLowStock, itemKey } from '../pantry';
 import { parseItems, parseNumber } from '../parsing';
-import { PantryItem, Recipe } from '../types';
+import { ListItem, PantryItem, Recipe } from '../types';
 import { convert, formatQuantity, unitLabel } from '../units';
 
 describe('units', () => {
@@ -143,6 +144,17 @@ describe('ingredient consolidation', () => {
         expect(lines.find(l => l.name === 'Butter')?.status).toBe('in-pantry');
         expect(itemsToBuy(lines).map(l => l.name)).toEqual(['Bread']);
     });
+
+    test('ingredients already on the list are not bought twice', () => {
+        const r = recipe('Toast', 1, [
+            { name: 'Bread', quantity: 2, unit: null, category: 'bakery' },
+            { name: 'Jam', quantity: 1, unit: null, category: 'pantry' },
+        ]);
+        const onList = [{ name: 'breads', deletedAt: null, isChecked: false, quantity: 2, unit: null }] as ListItem[];
+        const lines = consolidateIngredients([{ recipe: r, servings: 1 }], [], onList);
+        expect(lines.find(l => l.name === 'Bread')?.status).toBe('on-list');
+        expect(itemsToBuy(lines).map(l => l.name)).toEqual(['Jam']);
+    });
 });
 
 describe('entitlements', () => {
@@ -158,5 +170,33 @@ describe('entitlements', () => {
             expect(hasFeature(false, feature)).toBe(false);
             expect(hasFeature(true, feature)).toBe(true);
         }
+    });
+});
+
+describe('expiry alerts', () => {
+    const milk = { name: 'Milk', quantity: 1, expiresOn: '2026-11-10', deletedAt: null };
+
+    test('fire the chosen number of days before expiry', () => {
+        expect(planExpiryAlerts([milk], '2026-11-01', 2, 12)).toEqual([{ date: '2026-11-08', title: 'Use it soon', body: 'Milk expires in 2 days.' }]);
+        expect(planExpiryAlerts([milk], '2026-11-01', 5, 12)[0].date).toBe('2026-11-05');
+    });
+
+    test('items already inside the window fire at the next morning', () => {
+        expect(planExpiryAlerts([milk], '2026-11-09', 2, 8)[0]).toMatchObject({ date: '2026-11-09', body: 'Milk expires tomorrow.' });
+        expect(planExpiryAlerts([milk], '2026-11-09', 2, 12)[0]).toMatchObject({ date: '2026-11-10', body: 'Milk expires today.' });
+    });
+
+    test('nothing for expired, undated, used-up or deleted items', () => {
+        expect(planExpiryAlerts([milk], '2026-11-10', 2, 12)).toEqual([]);
+        expect(planExpiryAlerts([{ ...milk, expiresOn: null }], '2026-11-01', 2, 12)).toEqual([]);
+        expect(planExpiryAlerts([{ ...milk, quantity: 0 }], '2026-11-01', 2, 12)).toEqual([]);
+        expect(planExpiryAlerts([{ ...milk, deletedAt: '2026-11-01' }], '2026-11-01', 2, 12)).toEqual([]);
+    });
+
+    test('a day with several items sends one alert', () => {
+        const items = ['Eggs', 'Ham', 'Kale', 'Yogurt'].map(name => ({ ...milk, name }));
+        expect(planExpiryAlerts(items, '2026-11-01', 2, 12)).toEqual([
+            { date: '2026-11-08', title: '4 pantry items expire soon', body: 'Eggs, Ham, Kale and 1 more. The first expires in 2 days.' },
+        ]);
     });
 });

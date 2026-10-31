@@ -6,10 +6,17 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
+import { useExpiryAlerts } from '../state/expiryAlerts';
 import { useSession } from '../state/session';
 import { ToastHost } from '../ui/ToastHost';
 import { useTheme } from '../ui/theme';
 import { RootNavigator } from './navigation';
+
+/** Inside the ready branch: it reads the database, which opens during boot. */
+function ExpiryAlerts() {
+    useExpiryAlerts();
+    return null;
+}
 
 export function AppRoot() {
     const sessionReady = useSession(s => s.ready);
@@ -32,7 +39,10 @@ export function AppRoot() {
                         <ActivityIndicator size="large" color={colors.primary} />
                     </View>
                 ) : onboarded ? (
-                    <RootNavigator />
+                    <>
+                        <RootNavigator />
+                        <ExpiryAlerts />
+                    </>
                 ) : (
                     <OnboardingScreen />
                 )}
