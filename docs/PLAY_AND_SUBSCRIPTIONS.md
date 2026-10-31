@@ -26,8 +26,8 @@ details.
 
 ## 2. Internal testing (done)
 
-Release 5 (1.0.0), which includes the RevenueCat key, is live on the internal track, with the
-Owner tester list.
+Release 6 (1.0.0), which includes the RevenueCat key and the sync fix, is live on the internal
+track, with the Owner tester list.
 Opt-in link: https://play.google.com/apps/internaltest/4700202274636462994
 
 Later, for **Closed testing**, add at least 12 testers. They must stay opted in for 14 days
@@ -67,14 +67,13 @@ Published. RevenueCat is connected to Google notifications on topic
 Optional: for real-time renewal and cancellation events, enable that topic in Play Console →
 Monetise with Play → Monetisation setup → Real-time developer notifications, then Save changes.
 
-## 5. Test a purchase
+## 5. Test purchase (passed)
 
-Build 5 is already on the internal track, so no rebuild is needed for this test.
+Run on 2026-10-31 on build 5, installed from Play, with a licence-test account (sandbox, not
+charged). The webhook wrote `subscriptions/{uid}` with `isPro: true`, Pro unlocked on the phone,
+and renewals arrived about every 6 minutes. Six renewals later Play ended the test subscription:
+`EXPIRATION` set `isPro: false`, which returns the app to Free.
 
-1. Remove any copy of the app installed by USB (a different signing key blocks the Play install).
-2. Opt in through the testing link above, install from Play (not by USB: billing only works
-   for an app installed from Play), and buy Monthly. Test renewals are fast.
-
-**Passes when:** the Pro screen shows the Play prices; the purchase unlocks Pro; the webhook
-writes `subscriptions/{uid}`; a second device on the same account shows Pro; cancelling or
-expiry returns the app to Free.
+To repeat it: remove any copy installed by USB (a different signing key blocks the Play install),
+opt in through the testing link above, install from Play (billing only works for an app installed
+from Play), and buy Monthly.
