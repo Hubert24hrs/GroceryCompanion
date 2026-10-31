@@ -57,16 +57,13 @@ Done, in project **GroceryCompanion** (`46fddbbc`): Google Play app, entitlement
 `pro:monthly` and `pro:annual` attached to it, offering `default` with `$rc_monthly` and
 `$rc_annual`, and the public Android key stored in EAS's production environment.
 
-Still needs you, because both are secrets:
+The webhook is added and confirmed: RevenueCat's test event got a 200 from the live function.
+`revenuecat@dosealert-42199.iam.gserviceaccount.com` has access to GroceryCompanion in Play.
 
-1. **Webhook** (Integrations → Webhooks → Create new webhook). URL:
-   `https://europe-west1-grocery-companion-hub.cloudfunctions.net/revenuecatWebhook`.
-   Authorization header value is `Bearer <secret>`. This copies it to the clipboard unseen:
-   `(printf 'Bearer '; npx firebase functions:secrets:access REVENUECAT_WEBHOOK_SECRET) | tr -d '\r\n' | clip`
-2. **Google Play credentials** (Apps → GroceryCompanion (Play Store) → Service Account
-   Credentials JSON). If you kept the JSON key from DoseAlert, the same one works, because it's
-   the same Play developer account. Otherwise follow RevenueCat's "Google Play service
-   credentials" guide. New keys can take up to 36 hours to start working.
+Still needs you, because it's a secret: **Google Play credentials**. In Apps → GroceryCompanion
+(Play Store) → Service Account Credentials JSON, upload the key for that account, then click
+Save changes. New credentials can take up to 36 hours to start working. To speed that up, change
+a subscription's description in Play Console, save, then change it back.
 
 ## 5. Test a purchase
 
