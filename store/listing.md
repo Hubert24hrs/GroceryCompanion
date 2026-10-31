@@ -1,13 +1,13 @@
-# Google Play store listing — GroceryCompanion
+# Google Play store listing: Grocery Companion
 
 ## App name (30 max)
-GroceryCompanion
+Grocery Companion
 
 ## Short description (80 max)
 Shared grocery lists that sort by aisle, plus pantry, recipes and meal plans.
 
 ## Full description (4000 max)
-GroceryCompanion keeps your household's shopping, pantry and cooking in one calm place.
+Grocery Companion keeps your household's shopping, pantry and cooking in one calm place.
 
 LISTS THAT SORT THEMSELVES
 Type "2 lb chicken, milk, 6 eggs" and every item lands in the right aisle: produce, bakery, meat, dairy and more. Tick things off as you shop, then finish the trip to restock your pantry in one tap.
@@ -19,14 +19,14 @@ KNOW WHAT'S IN YOUR KITCHEN
 Your pantry is sorted by fridge, freezer and cupboard. Adjust quantities as you cook, and check what you already have before you shop.
 
 RECIPES THAT BECOME SHOPPING LISTS
-Start with a set of ready-made recipes or add your own. Scale servings, then send the missing ingredients straight to a list.
+Start with a set of ready made recipes or add your own. Scale servings, then send the missing ingredients straight to a list.
 
 GROCERYCOMPANION PRO
 Upgrade for the whole kitchen:
 • Unlimited lists and reusable list templates
 • Weekly meal planner that builds one shopping list
 • Smart meal ideas ranked by your pantry, expiry dates, diet and budget
-• Expiry and low-stock alerts
+• Expiry and low stock alerts
 • Barcode scanning straight into your pantry
 • Unlimited recipe box and bigger households
 • Full spending history and price tracking
@@ -41,7 +41,7 @@ Food & Drink
 
 ## Contact details
 - Website: https://grocery-companion-hub.web.app
-- Email: (your choice — shown publicly on the listing)
+- Email: (your choice, shown publicly on the listing)
 - Privacy policy: https://grocery-companion-hub.web.app/privacy
 - Account deletion: https://grocery-companion-hub.web.app/delete-account
 

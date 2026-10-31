@@ -24,7 +24,7 @@ function weekLabel(start: string, current: string): string {
     if (start === addDays(current, 7)) return 'Next week';
     if (start === addDays(current, -7)) return 'Last week';
     const end = addDays(start, 6);
-    return `${formatDay(start, { month: 'short', day: 'numeric' })} – ${formatDay(end, { month: 'short', day: 'numeric' })}`;
+    return `${formatDay(start, { month: 'short', day: 'numeric' })} to ${formatDay(end, { month: 'short', day: 'numeric' })}`;
 }
 
 /** Meal planning is a Pro feature; free users see what it does and how to unlock it. */

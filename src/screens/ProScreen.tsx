@@ -114,7 +114,7 @@ export function ProScreen({ navigation }: RootScreenProps<'Pro'>) {
                         <Ionicons name="sparkles" size={30} color={colors.onAccent} />
                     </View>
                     <Text variant="title" style={{ textAlign: 'center' }}>
-                        {isPro ? 'You’re on Pro' : 'GroceryCompanion Pro'}
+                        {isPro ? 'You’re on Pro' : 'Grocery Companion Pro'}
                     </Text>
                     <Text muted style={{ textAlign: 'center' }}>
                         {isPro ? 'Everything below is unlocked on your account.' : 'Every feature, for your whole kitchen. Cancel any time.'}

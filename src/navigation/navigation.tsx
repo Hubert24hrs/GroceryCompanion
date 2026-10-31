@@ -105,7 +105,7 @@ export function RootNavigator() {
     }, [dark, colors]);
 
     return (
-        <NavigationContainer theme={navTheme} documentTitle={{ formatter: o => (o?.title ? `${o.title} · GroceryCompanion` : 'GroceryCompanion') }}>
+        <NavigationContainer theme={navTheme} documentTitle={{ formatter: o => (o?.title ? `${o.title} · Grocery Companion` : 'Grocery Companion') }}>
             <Stack.Navigator screenOptions={{ headerTintColor: colors.primary, headerTitleStyle: { color: colors.text }, headerShadowVisible: false }}>
                 <Stack.Screen name="Tabs" component={Tabs} options={{ headerShown: false }} />
                 <Stack.Screen name="ListDetail" component={ListDetailScreen} options={{ title: 'List' }} />

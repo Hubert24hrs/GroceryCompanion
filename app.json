@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "GroceryCompanion",
+    "name": "Grocery Companion",
     "slug": "GroceryCompanion",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -61,7 +61,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow GroceryCompanion to access your camera.",
+          "cameraPermission": "Allow Grocery Companion to access your camera.",
           "recordAudioAndroid": false
         }
       ],

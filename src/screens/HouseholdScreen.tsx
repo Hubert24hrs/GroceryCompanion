@@ -18,8 +18,8 @@ import { AuthMode, AuthSheet } from './settings/AuthSheet';
 
 const ROLE_LABEL: Record<Role, string> = { owner: 'Owner', editor: 'Can edit', viewer: 'View only' };
 
-/** "ABCDE12345" → "ABCDE-12345" for reading aloud or typing. */
-const prettyCode = (code: string) => (code.length === 10 ? `${code.slice(0, 5)}-${code.slice(5)}` : code);
+/** "ABCDE12345" → "ABCDE 12345" for reading aloud or typing. */
+const prettyCode = (code: string) => (code.length === 10 ? `${code.slice(0, 5)} ${code.slice(5)}` : code);
 
 export function HouseholdScreen({ navigation }: RootScreenProps<'Household'>) {
     const { colors } = useTheme();
@@ -87,7 +87,7 @@ export function HouseholdScreen({ navigation }: RootScreenProps<'Household'>) {
     };
 
     const shareInvite = async (inv: Invite) => {
-        const message = `Join my GroceryCompanion household “${householdName}”: open the app, go to Settings → Household and enter code ${prettyCode(inv.code)}`;
+        const message = `Join my Grocery Companion household “${householdName}”: open the app, go to Settings → Household and enter code ${prettyCode(inv.code)}`;
         try {
             if (Platform.OS === 'web' && !(navigator as Navigator & { share?: unknown }).share) {
                 await navigator.clipboard.writeText(message);
@@ -267,7 +267,7 @@ export function HouseholdScreen({ navigation }: RootScreenProps<'Household'>) {
                                 setCode(t.toUpperCase());
                                 setCodeError(null);
                             }}
-                            placeholder="ABCDE-12345"
+                            placeholder="ABCDE 12345"
                             autoCapitalize="characters"
                             autoCorrect={false}
                             accessibilityLabel="Invite code"

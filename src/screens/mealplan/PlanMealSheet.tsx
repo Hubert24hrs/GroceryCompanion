@@ -127,7 +127,7 @@ export function PlanMealSheet({ target, onClose, dates }: { target: PlanTarget |
                     <View style={[styles.options, { borderColor: colors.border }]}>
                         {options.length === 0 ? (
                             <Text variant="caption" muted style={{ padding: spacing.md }}>
-                                {recipes.length ? 'No recipes match.' : 'Your recipe box is empty — add a note below instead.'}
+                                {recipes.length ? 'No recipes match.' : 'Your recipe box is empty. Add a note below instead.'}
                             </Text>
                         ) : null}
                         {options.map(r => {

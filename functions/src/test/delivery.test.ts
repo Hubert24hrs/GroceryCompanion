@@ -65,7 +65,7 @@ describe('shoppingListBody', () => {
     test('sends nothing about the user or their list name', () => {
         const body = shoppingListBody(items);
         assert.deepEqual(Object.keys(body).sort(), ['expires_in', 'line_items', 'link_type', 'title']);
-        assert.equal(body.title, 'GroceryCompanion shopping list');
+        assert.equal(body.title, 'Grocery Companion shopping list');
     });
 });
 

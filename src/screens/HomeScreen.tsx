@@ -154,8 +154,8 @@ export function HomeScreen({ navigation }: TabScreenProps<'Home'>) {
 
             {!isPro ? (
                 <ProLock
-                    title="Get more from GroceryCompanion"
-                    detail="Meal planner, expiry and low-stock alerts, barcode scanning and unlimited lists with Pro."
+                    title="Get more from Grocery Companion"
+                    detail="Meal planner, expiry and low stock alerts, barcode scanning and unlimited lists with Pro."
                     onPress={() => navigation.navigate('Pro')}
                 />
             ) : null}

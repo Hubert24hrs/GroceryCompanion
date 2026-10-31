@@ -15,7 +15,7 @@ export class PurchaseError extends Error {
 }
 
 export const purchasesAvailable = false;
-export const purchasesUnavailableReason = 'Subscribe from the GroceryCompanion iOS or Android app. Your Pro status follows your account.';
+export const purchasesUnavailableReason = 'Subscribe from the Grocery Companion iOS or Android app. Your Pro status follows your account.';
 
 export async function configurePurchases(_userId: string | null): Promise<boolean | null> {
     return null;

@@ -183,7 +183,7 @@ export function PantryScreen({ route, navigation }: TabScreenProps<'Pantry'>) {
                 <>
                     {!alertsAllowed && (expiring.length > 0 || low.length > 0) && !query ? (
                         <ProLock
-                            title="Expiry & low-stock alerts"
+                            title="Expiry & low stock alerts"
                             detail="See what to use soon and restock what's running low in one tap."
                             onPress={() => navigation.navigate('Pro')}
                         />

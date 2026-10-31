@@ -68,13 +68,13 @@ export function PantryItemSheet({ item, draft, onClose }: { item: PantryItem | n
     const save = () => {
         const n = validateName(name, 'Name');
         const q = parseOptionalNumber(quantity, 'Quantity');
-        const t = parseOptionalNumber(threshold, 'Low-stock level');
+        const t = parseOptionalNumber(threshold, 'Low stock level');
         const e = expiry.trim();
         const next: Errors = {
             name: n.ok ? undefined : n.error,
             quantity: !q.ok ? q.error : q.value == null ? 'Enter how many you have (0 is fine).' : undefined,
             threshold: t.ok ? undefined : t.error,
-            expiry: e && !isValidISODate(e) ? 'Use the format YYYY-MM-DD.' : undefined,
+            expiry: e && !isValidISODate(e) ? 'Use the format YYYY/MM/DD.' : undefined,
         };
         if (Object.values(next).some(Boolean) || !n.ok || !q.ok || !t.ok) {
             setErrors(next);
@@ -128,7 +128,7 @@ export function PantryItemSheet({ item, draft, onClose }: { item: PantryItem | n
             {draft?.barcode ? (
                 <Text variant="caption" muted>
                     Barcode {draft.barcode}
-                    {draft.unknownBarcode ? " — we couldn't find this product. Name it once and we'll remember it." : ''}
+                    {draft.unknownBarcode ? ". We couldn't find this product. Name it once and we'll remember it." : ''}
                 </Text>
             ) : null}
             <Field label="Name" value={name} onChangeText={setName} placeholder="e.g. Greek yogurt" autoFocus={!item && !draft?.name} error={errors.name} />
@@ -182,9 +182,9 @@ export function PantryItemSheet({ item, draft, onClose }: { item: PantryItem | n
             <View style={styles.group}>
                 <Field
                     label="Best before"
-                    value={expiry}
-                    onChangeText={setExpiry}
-                    placeholder="YYYY-MM-DD"
+                    value={expiry.replace(/-/g, '/')}
+                    onChangeText={t => setExpiry(t.replace(/\//g, '-'))}
+                    placeholder="YYYY/MM/DD"
                     autoCapitalize="none"
                     error={errors.expiry}
                 />

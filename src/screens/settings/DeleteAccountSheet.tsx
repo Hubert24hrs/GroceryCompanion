@@ -57,9 +57,9 @@ export function DeleteAccountSheet({ visible, onClose }: { visible: boolean; onC
     const points = user
         ? [
               role === 'owner'
-                  ? `Your household “${householdName}” with all its lists, pantry, recipes, meal plans and spending history${others ? ` — the ${others} other member${others === 1 ? '' : 's'} will lose access to it` : ''}`
+                  ? `Your household “${householdName}” with all its lists, pantry, recipes, meal plans and spending history${others ? `, the ${others} other member${others === 1 ? '' : 's'} will lose access to it` : ''}`
                   : `You’ll be removed from “${householdName}”; its owner keeps the shared lists`,
-              'Your preferences and sign-in account',
+              'Your preferences and sign in account',
               'Everything stored on this device',
           ]
         : ['All lists, pantry items, recipes, meal plans and spending history on this device', 'Your preferences'];

@@ -121,7 +121,7 @@ export function RecipeDetailScreen({ route, navigation }: RootScreenProps<'Recip
                             {tags.map(t => (
                                 <View key={t} style={[styles.tag, { backgroundColor: colors.surfaceAlt }]}>
                                     <Text variant="caption" muted>
-                                        {t}
+                                        {t.replace(/-/g, ' ')}
                                     </Text>
                                 </View>
                             ))}

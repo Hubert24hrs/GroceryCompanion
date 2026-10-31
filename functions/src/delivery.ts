@@ -87,7 +87,7 @@ export function parseDeliveryRequest(data: unknown): DeliveryRequest {
 /** Only the items: no list name, household or account details leave the app. */
 export function shoppingListBody(items: DeliveryItem[]) {
     return {
-        title: 'GroceryCompanion shopping list',
+        title: 'Grocery Companion shopping list',
         link_type: 'shopping_list',
         expires_in: LINK_DAYS,
         line_items: items.map(({ name, quantity, unit }) => {

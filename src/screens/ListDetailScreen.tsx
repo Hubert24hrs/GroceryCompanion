@@ -111,13 +111,13 @@ export function ListDetailScreen({ route, navigation }: RootScreenProps<'ListDet
     const menu: ActionItem[] = [
         { label: 'Edit details', icon: 'create-outline', onPress: () => setFormOpen(true) },
         {
-            label: 'Add low-stock pantry items',
+            label: 'Add low stock pantry items',
             icon: 'file-tray-stacked-outline',
             onPress: () =>
                 !isPro
                     ? navigation.navigate('Pro')
                     : addLowStockToList(listId).then(
-                    n => toast(n ? `Added ${n} low-stock item${n === 1 ? '' : 's'}.` : 'Nothing in the pantry is running low.', { tone: n ? 'success' : 'info' }),
+                    n => toast(n ? `Added ${n} low stock item${n === 1 ? '' : 's'}.` : 'Nothing in the pantry is running low.', { tone: n ? 'success' : 'info' }),
                     toastError,
                 ),
         },
@@ -217,7 +217,7 @@ export function ListDetailScreen({ route, navigation }: RootScreenProps<'ListDet
                     <EmptyState
                         icon="basket-outline"
                         title="Nothing on this list"
-                        message={editable ? 'Type a few items above — separate them with commas.' : 'Items your household adds will show up here.'}
+                        message={editable ? 'Type a few items above, separated by commas.' : 'Items your household adds will show up here.'}
                     />
                 }
                 renderSectionHeader={({ section }) => (

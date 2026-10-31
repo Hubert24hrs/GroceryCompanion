@@ -78,7 +78,7 @@ export const PRO_FEATURES: { feature: ProFeature; title: string; detail: string;
     { feature: 'listTemplates', title: 'Reusable list templates', detail: 'Weekly staples in one tap', icon: 'copy' },
     { feature: 'mealPlanner', title: 'Meal planner', detail: 'Plan the week and get one shopping list', icon: 'calendar' },
     { feature: 'smartSuggestions', title: 'Smart meal ideas', detail: 'Ranked by pantry, expiry, diet and budget', icon: 'sparkles' },
-    { feature: 'pantryAlerts', title: 'Expiry & low-stock alerts', detail: 'Use food before it goes off, restock in one tap', icon: 'alarm' },
+    { feature: 'pantryAlerts', title: 'Expiry & low stock alerts', detail: 'Use food before it goes off, restock in one tap', icon: 'alarm' },
     { feature: 'barcodeScanner', title: 'Barcode scanning', detail: 'Scan products straight into your pantry', icon: 'barcode' },
     { feature: 'unlimitedRecipes', title: 'Unlimited recipe box', detail: `Free holds ${FREE_LIMITS.recipes} recipes`, icon: 'book' },
     { feature: 'unlimitedMembers', title: 'Bigger households', detail: `Share with more than ${FREE_LIMITS.householdMembers - 1} other person`, icon: 'people' },

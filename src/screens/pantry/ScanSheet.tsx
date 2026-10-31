@@ -71,7 +71,7 @@ export function ScanSheet({ visible, onClose, onCode, busy }: {
                     <View style={[styles.camera, styles.denied, { backgroundColor: colors.surfaceAlt }]}>
                         <Text muted style={{ textAlign: 'center' }}>
                             {permission && !permission.canAskAgain
-                                ? 'Camera access is off for GroceryCompanion. Turn it on in Settings, or type the barcode below.'
+                                ? 'Camera access is off for Grocery Companion. Turn it on in Settings, or type the barcode below.'
                                 : 'Allow camera access to scan barcodes.'}
                         </Text>
                         {permission?.canAskAgain !== false ? <Button title="Allow camera" small onPress={() => void requestPermission()} /> : null}

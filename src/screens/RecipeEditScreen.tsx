@@ -140,7 +140,7 @@ export function RecipeEditScreen({ route, navigation }: RootScreenProps<'RecipeE
 
                 <View style={{ gap: spacing.sm }}>
                     <Field
-                        label="Ingredients — one per line"
+                        label="Ingredients (one per line)"
                         value={ingredients}
                         onChangeText={setIngredients}
                         placeholder={'500 g spaghetti\n2 cloves garlic, minced\n1 can chopped tomatoes'}
@@ -174,7 +174,7 @@ export function RecipeEditScreen({ route, navigation }: RootScreenProps<'RecipeE
                 </View>
 
                 <Field
-                    label="Method — one step per line"
+                    label="Method (one step per line)"
                     value={instructions}
                     onChangeText={setInstructions}
                     placeholder={'Boil the pasta.\nFry the garlic in olive oil…'}
@@ -192,7 +192,7 @@ export function RecipeEditScreen({ route, navigation }: RootScreenProps<'RecipeE
                         </View>
                     ) : null}
                 </View>
-                <Field label="Tags — comma separated" value={tags} onChangeText={setTags} placeholder="Vegetarian, Quick, Freezer-friendly" />
+                <Field label="Tags (comma separated)" value={tags} onChangeText={setTags} placeholder="Vegetarian, Quick, Freezer friendly" />
                 <View style={styles.row}>
                     <View style={styles.cell}>
                         <Field label="Calories / serving" value={calories} onChangeText={setCalories} keyboardType="number-pad" error={errors.calories} />

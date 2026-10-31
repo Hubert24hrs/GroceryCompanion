@@ -13,7 +13,7 @@ import { toast, toastError } from './toast';
 export async function enableExpiryAlerts(): Promise<void> {
     const granted = await requestNotificationPermission();
     if (!granted) {
-        toast('Notifications are off for GroceryCompanion, so reminders can’t be shown.', {
+        toast('Notifications are off for Grocery Companion, so reminders can’t be shown.', {
             tone: 'warning',
             actionLabel: 'Open settings',
             onAction: () => void Linking.openSettings().catch(toastError),

@@ -25,7 +25,7 @@ export function OnboardingScreen() {
                     <Ionicons name="basket" size={40} color={colors.onPrimary} />
                 </View>
                 <Text variant="title" style={{ textAlign: 'center' }}>
-                    GroceryCompanion
+                    Grocery Companion
                 </Text>
                 <Text muted style={{ textAlign: 'center' }}>
                     Your lists, pantry and meal plan in one calm place. Works offline, syncs when you sign in.

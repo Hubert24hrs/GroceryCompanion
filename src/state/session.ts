@@ -81,8 +81,8 @@ const AUTH_MESSAGES: Record<string, string> = {
     'auth/too-many-requests': 'Too many attempts. Wait a few minutes and try again.',
     'auth/network-request-failed': "Can't reach the server. Check your connection and try again.",
     'auth/user-disabled': 'This account has been disabled.',
-    'auth/operation-not-allowed': "Email sign-in isn't switched on for this app yet.",
-    'auth/configuration-not-found': "Email sign-in isn't switched on for this app yet.",
+    'auth/operation-not-allowed': "Email sign in isn't switched on for this app yet.",
+    'auth/configuration-not-found': "Email sign in isn't switched on for this app yet.",
 };
 
 /** Friendly text for Firebase Auth errors. */

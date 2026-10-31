@@ -87,7 +87,7 @@ function SyncDetails() {
         sync.status === 'syncing'
             ? 'Syncing…'
             : sync.status === 'offline'
-              ? 'Offline — changes are saved here and will upload later'
+              ? 'Offline. Changes are saved here and will upload later.'
               : sync.status === 'error'
                 ? `Sync stopped: ${sync.lastError ?? 'unknown error'}`
                 : sync.lastSyncedAt
@@ -243,7 +243,7 @@ export function SettingsScreen({ navigation }: RootScreenProps<'Settings'>) {
                         <Row
                             icon="sparkles-outline"
                             tint={colors.accent}
-                            label={isPro ? 'GroceryCompanion Pro' : 'Free plan'}
+                            label={isPro ? 'Grocery Companion Pro' : 'Free plan'}
                             detail={isPro ? 'Thanks for supporting the app!' : 'Unlimited lists and recipes, smart meal ideas, full spending history'}
                             onPress={() => navigation.navigate('Pro')}
                         />
@@ -280,7 +280,7 @@ export function SettingsScreen({ navigation }: RootScreenProps<'Settings'>) {
                             </Text>
                             <View style={styles.chips}>
                                 {DIETARY_OPTIONS.map(d => (
-                                    <Chip key={d} label={d[0].toUpperCase() + d.slice(1)} selected={prefs.dietary.includes(d)} onPress={() => toggleDiet(d)} />
+                                    <Chip key={d} label={d[0].toUpperCase() + d.slice(1).replace(/-/g, ' ')} selected={prefs.dietary.includes(d)} onPress={() => toggleDiet(d)} />
                                 ))}
                             </View>
                         </View>
@@ -367,7 +367,7 @@ export function SettingsScreen({ navigation }: RootScreenProps<'Settings'>) {
                 </Section>
 
                 <Text variant="caption" muted style={{ textAlign: 'center' }}>
-                    GroceryCompanion {appConfig.expo.version}
+                    Grocery Companion {appConfig.expo.version}
                 </Text>
 
                 {/* Last item on purpose: the stores require in-app account deletion. */}

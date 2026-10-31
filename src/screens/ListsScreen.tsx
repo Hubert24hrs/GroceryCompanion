@@ -86,7 +86,7 @@ export function ListsScreen({ navigation }: TabScreenProps<'Lists'>) {
                         return;
                     }
                     copyList(list.id, { name: list.name, isTemplate: true }).then(
-                        () => toast('Saved as a template — find it under Templates.', { tone: 'success' }),
+                        () => toast('Saved as a template. Find it under Templates.', { tone: 'success' }),
                         toastError,
                     );
                 },

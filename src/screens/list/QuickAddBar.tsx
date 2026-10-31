@@ -47,7 +47,7 @@ export function QuickAddBar({ listId }: { listId: string }) {
             if (results.length === 1) {
                 const [{ item, merged, warning }] = results;
                 if (merged) {
-                    toast(`${item.name} was already on the list — now ${formatQuantity(item.quantity, item.unit) || 'more'}.`, { tone: 'info' });
+                    toast(`${item.name} was already on the list, now ${formatQuantity(item.quantity, item.unit) || 'more'}.`, { tone: 'info' });
                 } else if (warning?.kind === 'in-pantry') {
                     toast(`You have ${formatQuantity(warning.item.quantity, warning.item.unit)} ${warning.item.name} in the pantry.`, {
                         tone: 'warning',
@@ -111,7 +111,7 @@ export function QuickAddBar({ listId }: { listId: string }) {
                     onFocus={() => setFocused(true)}
                     onBlur={() => setTimeout(() => setFocused(false), 150)}
                     onSubmitEditing={() => void submit()}
-                    placeholder={listening ? 'Listening…' : 'Add items — e.g. 2 lb chicken, milk'}
+                    placeholder={listening ? 'Listening…' : 'Add items, like 2 lb chicken, milk'}
                     placeholderTextColor={colors.textMuted}
                     returnKeyType="done"
                     blurOnSubmit={false}
