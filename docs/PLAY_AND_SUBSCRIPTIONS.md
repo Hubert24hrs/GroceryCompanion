@@ -60,16 +60,18 @@ Done, in project **GroceryCompanion** (`46fddbbc`): Google Play app, entitlement
 The webhook is added and confirmed: RevenueCat's test event got a 200 from the live function.
 `revenuecat@dosealert-42199.iam.gserviceaccount.com` has access to GroceryCompanion in Play.
 
-Still needs you, because it's a secret: **Google Play credentials**. In Apps → GroceryCompanion
-(Play Store) → Service Account Credentials JSON, upload the key for that account, then click
-Save changes. New credentials can take up to 36 hours to start working. To speed that up, change
-a subscription's description in Play Console, save, then change it back.
+Google Play credentials are uploaded and show "Valid credentials", and both products show
+Published. RevenueCat is connected to Google notifications on topic
+`projects/dosealert-42199/topics/Play-Store-Notifications`.
+
+Optional: for real-time renewal and cancellation events, enable that topic in Play Console →
+Monetise with Play → Monetisation setup → Real-time developer notifications, then Save changes.
 
 ## 5. Test a purchase
 
 Build 5 is already on the internal track, so no rebuild is needed for this test.
 
-1. Finish both secret steps in section 4.
+1. Remove any copy of the app installed by USB (a different signing key blocks the Play install).
 2. Opt in through the testing link above, install from Play (not by USB: billing only works
    for an app installed from Play), and buy Monthly. Test renewals are fast.
 
