@@ -6,22 +6,24 @@ Every decision (feature gates, limits, entitlement, delivery countries) is in
 
 ## Test results
 
-Run on 2026-10-31 on build 8, installed from Play on the test phone, with the web preview as the
-second device and a sandbox subscription.
+Run on 2026-10-31 on builds 8 and 10, installed from Play on the test phone, with the web preview
+as the second device and a sandbox subscription.
 
 | Check | Result |
 |---|---|
 | Rules, index and functions deployed | Done |
 | Free: recipe to list opens; alerts and Pro features lead to the Pro screen | Passed |
-| Pro: webhook sets `isPro` and `ownerPro`, app unlocks | Passed, after the renewal below |
-| Live sync, PC to phone | Passed, about 6 seconds |
-| Live sync, phone to PC | Passed, about 4 seconds |
+| Pro: webhook sets `isPro` and `ownerPro`, app unlocks | Passed; on build 10 the first event applied at once |
+| Live sync, PC to phone | Passed on builds 8 and 10, within 7 seconds |
+| Live sync, phone to PC | Passed on builds 8 and 10, within 4 seconds |
 | Listener stops when the list closes, catches up on reopening | Passed |
 | Expiry reminder scheduled at 9 am, 2 days before; channel created | Passed |
 | A reminder actually appearing at 9 am | Not seen: it needs the phone to reach that time |
 | Two people in one household | Rules tests only |
 | Real Instacart API | Not possible: applications are closed |
-| Sign-in prompt before buying; already-owned restore (in later commits) | Not on a device yet: needs a new build |
+| Sign-in prompt before buying | Passed on build 10: Play's sheet never opens |
+| Sandbox Pro expiring back to Free | Passed |
+| Already-owned restore | Not on a device: the sign-in prompt now prevents the usual way to reach it |
 
 Buying before signing in was found this way. The event arrives with an anonymous ID, so the webhook
 records nothing until a renewal carries the account ID. Restore fixed the phone at once, and the next
