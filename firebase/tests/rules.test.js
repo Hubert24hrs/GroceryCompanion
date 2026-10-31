@@ -14,6 +14,8 @@ const {
     getDoc,
     getDocs,
     increment,
+    limit,
+    orderBy,
     query,
     serverTimestamp,
     setDoc,
@@ -265,6 +267,46 @@ describe('member limit and Pro', () => {
         await asAdmin(store => setDoc(doc(store, 'subscriptions', 'alice'), { isPro: true }));
         await assertSucceeds(getDoc(doc(db('alice'), 'subscriptions', 'alice')));
         await assertFails(getDoc(doc(db('bob'), 'subscriptions', 'alice')));
+    });
+});
+
+describe('live sync', () => {
+    const newest = (store, n) =>
+        getDocs(query(collection(store, 'households/h1/items'), where('list_id', '==', 'l1'), orderBy('server_updated_at', 'desc'), limit(n)));
+
+    async function sharedHousehold() {
+        await aliceWithHousehold();
+        await asAdmin(async store => {
+            await updateDoc(doc(store, 'households', 'h1'), { memberIds: ['alice', 'bob'] });
+            await setDoc(doc(store, 'households/h1/members/bob'), { userId: 'bob', role: 'editor' });
+        });
+    }
+
+    test('free households pull in pages but cannot run the live listener', async () => {
+        await sharedHousehold();
+        await assertFails(newest(db('bob'), 1));
+        await assertSucceeds(newest(db('bob'), 500));
+        await assertSucceeds(getDoc(doc(db('bob'), 'households/h1/items/i1')));
+    });
+
+    test("the owner's Pro unlocks it for every member", async () => {
+        await sharedHousehold();
+        await asAdmin(store => updateDoc(doc(store, 'households', 'h1'), { ownerPro: true }));
+        await assertSucceeds(newest(db('alice'), 1));
+        await assertSucceeds(newest(db('bob'), 1));
+    });
+
+    test("a member's own Pro unlocks it for that member only", async () => {
+        await sharedHousehold();
+        await asAdmin(store => setDoc(doc(store, 'subscriptions', 'bob'), { isPro: true }));
+        await assertSucceeds(newest(db('bob'), 1));
+        await assertFails(newest(db('alice'), 1));
+    });
+
+    test('Pro never opens another household', async () => {
+        await sharedHousehold();
+        await asAdmin(store => updateDoc(doc(store, 'households', 'h1'), { ownerPro: true }));
+        await assertFails(newest(db('mallory'), 1));
     });
 });
 

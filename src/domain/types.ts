@@ -169,6 +169,7 @@ export interface UserPreferences {
     currency: string;
     theme: 'system' | 'light' | 'dark';
     haptics: boolean;
+    liveHintDismissed: boolean;
 }
 
 export const SYNCED_TABLES = ['lists', 'items', 'pantry_items', 'recipes', 'meal_plan_entries', 'purchases'] as const;

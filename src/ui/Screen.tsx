@@ -1,6 +1,8 @@
 import React from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSession } from '../state/session';
+import { useSyncRefresh } from '../state/sync';
 import { Text } from './primitives';
 import { spacing, useTheme } from './theme';
 
@@ -24,6 +26,14 @@ export function ScreenHeader({ title, subtitle, right }: { title: string; subtit
     );
 }
 
+/** Pull-to-refresh for signed-in users, who have something to fetch. */
+export function useSyncRefreshControl() {
+    const { colors } = useTheme();
+    const linked = useSession(s => s.linked);
+    const { refreshing, onRefresh } = useSyncRefresh();
+    return linked ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} /> : undefined;
+}
+
 /** Scrollable tab-screen body with the standard header. */
 export function TabScreen({ title, subtitle, right, children }: {
     title: string;
@@ -32,9 +42,10 @@ export function TabScreen({ title, subtitle, right, children }: {
     children: React.ReactNode;
 }) {
     const { colors } = useTheme();
+    const refreshControl = useSyncRefreshControl();
     return (
         <View style={[styles.root, { backgroundColor: colors.background }]}>
-            <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+            <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" refreshControl={refreshControl}>
                 <ScreenHeader title={title} subtitle={subtitle} right={right} />
                 <View style={styles.body}>{children}</View>
             </ScrollView>

@@ -1,5 +1,6 @@
 import { consolidateIngredients, itemsToBuy } from '../aggregate';
 import { autoCategorize } from '../categories';
+import { canLiveSync, FEATURE_ACCESS, hasFeature } from '../entitlements';
 import { defaultPantryLocation, expiryStatus, isLowStock, itemKey } from '../pantry';
 import { parseItems, parseNumber } from '../parsing';
 import { PantryItem, Recipe } from '../types';
@@ -141,5 +142,21 @@ describe('ingredient consolidation', () => {
         const lines = consolidateIngredients([{ recipe: r, servings: 1 }], pantry);
         expect(lines.find(l => l.name === 'Butter')?.status).toBe('in-pantry');
         expect(itemsToBuy(lines).map(l => l.name)).toEqual(['Bread']);
+    });
+});
+
+describe('entitlements', () => {
+    test('live sync needs your own Pro or the household owner', () => {
+        expect(canLiveSync(false, false)).toBe(false);
+        expect(canLiveSync(true, false)).toBe(true);
+        expect(canLiveSync(false, true)).toBe(true);
+    });
+
+    test('the new features need Pro', () => {
+        for (const feature of ['liveSync', 'recipeToList', 'pantryAlerts', 'delivery'] as const) {
+            expect(FEATURE_ACCESS[feature]).toBe('pro');
+            expect(hasFeature(false, feature)).toBe(false);
+            expect(hasFeature(true, feature)).toBe(true);
+        }
     });
 });

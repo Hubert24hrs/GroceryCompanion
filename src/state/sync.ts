@@ -1,17 +1,17 @@
 import NetInfo from '@react-native-community/netinfo';
-import { collection, doc, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
-import { useEffect, useState } from 'react';
+import { useIsFocused } from '@react-navigation/native';
+import { collection, doc, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { useCallback, useEffect, useState } from 'react';
 import { AppState } from 'react-native';
-import { SYNCED_TABLES } from '../domain/types';
 import { getDb } from '../data/db';
 import { firestore } from '../services/firebase';
 import { createFirestoreRemote } from '../sync/firestoreRemote';
 import { SyncEngine, SyncState } from '../sync/engine';
 
 /**
- * Drives the SyncEngine: pushes shortly after local edits, syncs on
- * reconnect, on foreground, every minute, and whenever Firestore reports a
- * change in the active household.
+ * Drives the SyncEngine: pushes shortly after local edits, syncs on reconnect,
+ * on foreground and on pull-to-refresh, and retries unsent changes every
+ * minute. Live updates are Pro: see watchList.
  */
 class SyncController {
     engine: SyncEngine | null = null;
@@ -44,16 +44,11 @@ class SyncController {
         );
         const appState = AppState.addEventListener('change', s => s === 'active' && this.schedule(0));
         this.cleanups.push(() => appState.remove());
-        const interval = setInterval(() => this.schedule(0), 60_000);
+        const interval = setInterval(() => engine.state.pending > 0 && this.schedule(0), 60_000);
         this.cleanups.push(() => clearInterval(interval));
 
-        // Realtime: watch the newest change in each table and pull when it moves.
-        const warn = (e: Error) => console.warn('Live updates paused:', e.message);
-        for (const table of SYNCED_TABLES) {
-            const latest = query(collection(fs, 'households', householdId, table), orderBy('server_updated_at', 'desc'), limit(1));
-            this.cleanups.push(onSnapshot(latest, { includeMetadataChanges: false }, () => this.schedule(400), warn));
-        }
-        // Role changes, removal, or a rename: refresh the household.
+        const warn = (e: Error) => console.warn('Household updates paused:', e.message);
+        // Role changes, removal, a rename, or the owner's Pro: refresh the household.
         let seenMember = false;
         this.cleanups.push(
             onSnapshot(
@@ -80,6 +75,18 @@ class SyncController {
         void engine.syncNow();
     }
 
+    /**
+     * Pull whenever the newest item of one list changes. Reading a single
+     * row keeps the listener cheap, and the rules only allow this query for
+     * Pro households.
+     */
+    watchList(listId: string): () => void {
+        if (!firestore) return () => undefined;
+        const items = collection(firestore, 'households', getDb().householdId, 'items');
+        const latest = query(items, where('list_id', '==', listId), orderBy('server_updated_at', 'desc'), limit(1));
+        return onSnapshot(latest, { includeMetadataChanges: false }, () => this.schedule(400), e => console.warn('Live updates paused:', e.message));
+    }
+
     schedule(delayMs: number) {
         if (this.pushTimer) clearTimeout(this.pushTimer);
         this.pushTimer = setTimeout(() => {
@@ -103,4 +110,27 @@ export function useSyncState(): SyncState {
     const [state, setState] = useState(engine.state);
     useEffect(() => engine.subscribe(setState), [engine]);
     return state;
+}
+
+/** Live updates for the list on screen; stops off screen and in the background. */
+export function useLiveList(listId: string, enabled: boolean) {
+    const focused = useIsFocused();
+    const [foreground, setForeground] = useState(AppState.currentState === 'active');
+    useEffect(() => {
+        const sub = AppState.addEventListener('change', s => setForeground(s === 'active'));
+        return () => sub.remove();
+    }, []);
+    useEffect(() => {
+        if (enabled && focused && foreground) return syncController.watchList(listId);
+    }, [enabled, focused, foreground, listId]);
+}
+
+/** Pull-to-refresh: a full sync, spinning until it ends. */
+export function useSyncRefresh() {
+    const [refreshing, setRefreshing] = useState(false);
+    const onRefresh = useCallback(() => {
+        setRefreshing(true);
+        void syncController.init().syncNow().finally(() => setRefreshing(false));
+    }, []);
+    return { refreshing, onRefresh };
 }

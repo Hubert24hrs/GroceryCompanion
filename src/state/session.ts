@@ -11,6 +11,7 @@ import {
 } from 'firebase/auth';
 import { v4 as uuidv4 } from 'uuid';
 import { create } from 'zustand';
+import { canLiveSync } from '../domain/entitlements';
 import { HouseholdMember, Invite, Role, SYNCED_TABLES } from '../domain/types';
 import { META, openLocalDatabase, seedStarterRecipes } from '../data/bootstrap';
 import { getDb } from '../data/db';
@@ -36,6 +37,7 @@ interface SessionState {
     members: HouseholdMember[];
     storePro: boolean | null; // RevenueCat on this device
     accountPro: boolean; // server-side subscription (webhook)
+    ownerPro: boolean; // the active household's owner is on Pro (webhook)
     linking: boolean;
     /** The account's household is known server-side; sync may run. */
     linked: boolean;
@@ -62,6 +64,7 @@ interface SessionState {
 }
 
 export const useIsPro = () => useSession(s => s.storePro === true || s.accountPro);
+export const useLiveSync = () => useSession(s => s.linked && canLiveSync(s.storePro === true || s.accountPro, s.ownerPro));
 
 function requireAuth() {
     if (!auth) throw new Error('Accounts are not configured for this build.');
@@ -158,7 +161,7 @@ export const useSession = create<SessionState>((set, get) => {
         db.setHousehold(localId, null);
         seedStarterRecipes(db);
         await db.flush();
-        set({ user: null, linked: false, memberships: [], members: [], role: 'owner', householdName: 'My Household', accountPro: false });
+        set({ user: null, linked: false, memberships: [], members: [], role: 'owner', householdName: 'My Household', accountPro: false, ownerPro: false });
     }
 
     async function refresh() {
@@ -204,6 +207,7 @@ export const useSession = create<SessionState>((set, get) => {
             householdName: active?.household.name ?? 'My Household',
             members,
             accountPro,
+            ownerPro: active?.household.ownerPro ?? false,
         });
     }
 
@@ -224,6 +228,7 @@ export const useSession = create<SessionState>((set, get) => {
         members: [],
         storePro: null,
         accountPro: false,
+        ownerPro: false,
         linking: false,
         linked: false,
 

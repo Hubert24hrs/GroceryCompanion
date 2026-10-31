@@ -13,7 +13,7 @@ LISTS THAT SORT THEMSELVES
 Type "2 lb chicken, milk, 6 eggs" and every item lands in the right aisle: produce, bakery, meat, dairy and more. Tick things off as you shop, then finish the trip to restock your pantry in one tap.
 
 SHARE WITH YOUR HOUSEHOLD
-Create a free account to sync across your devices and invite someone to your household. Changes show up live for everyone, and the app keeps working offline, syncing when you're back online.
+Create a free account to sync across your devices and invite someone to your household. With Pro, the list you have open updates live as your household shops. The app keeps working offline, syncing when you're back online.
 
 KNOW WHAT'S IN YOUR KITCHEN
 Your pantry is sorted by fridge, freezer and cupboard. Adjust quantities as you cook, and check what you already have before you shop.

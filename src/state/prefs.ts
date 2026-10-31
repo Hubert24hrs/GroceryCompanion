@@ -13,6 +13,7 @@ export const DEFAULT_PREFS: UserPreferences = {
     currency: deviceCurrency(),
     theme: 'system',
     haptics: true,
+    liveHintDismissed: false,
 };
 
 export const DIETARY_OPTIONS = ['vegetarian', 'vegan', 'pescatarian', 'gluten-free', 'dairy-free'];

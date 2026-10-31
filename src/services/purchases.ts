@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import Purchases, { CustomerInfo, PurchasesPackage } from 'react-native-purchases';
+import { ENTITLEMENT_ID } from '../domain/entitlements';
 
 export interface PlanOption {
     id: string;
@@ -14,7 +15,6 @@ export class PurchaseError extends Error {
     }
 }
 
-const ENTITLEMENT = process.env.EXPO_PUBLIC_REVENUECAT_ENTITLEMENT_ID || 'pro';
 const rawKey = Platform.select({
     ios: process.env.EXPO_PUBLIC_REVENUECAT_API_KEY_IOS,
     android: process.env.EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID,
@@ -25,7 +25,7 @@ const apiKey = rawKey && !/\.\.\.|your[-_.]/i.test(rawKey) ? rawKey : undefined;
 let configured = false;
 let packages: PurchasesPackage[] = [];
 
-const isPro = (info: CustomerInfo) => Boolean(info.entitlements.active[ENTITLEMENT]);
+const isPro = (info: CustomerInfo) => Boolean(info.entitlements.active[ENTITLEMENT_ID]);
 
 export const purchasesAvailable = Boolean(apiKey);
 export const purchasesUnavailableReason = apiKey ? null : 'Subscriptions aren’t open yet in this version of the app.';

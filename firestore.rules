@@ -48,6 +48,17 @@ service cloud.firestore {
       return household.ownerPro == true ? 50 : 2;
     }
 
+    function subscribed() {
+      let sub = /databases/$(database)/documents/subscriptions/$(me());
+      return exists(sub) && get(sub).data.isPro == true;
+    }
+
+    // Live sync: the owner's Pro covers the household (OWNER_PRO_UNLOCKS_HOUSEHOLD
+    // in the app), and a member's own Pro covers that member.
+    function liveAllowed(hid) {
+      return get(householdPath(hid)).data.ownerPro == true || subscribed();
+    }
+
     function validName(name) {
       return name is string && name.size() > 0 && name.size() <= 60;
     }
@@ -166,7 +177,9 @@ service cloud.firestore {
             && (resource == null || row.updated_at >= resource.data.updated_at);
         }
 
-        allow read: if isSyncedTable() && isMember(hid);
+        allow get: if isSyncedTable() && isMember(hid);
+        // The live listener watches a single newest row; pulls read in pages.
+        allow list: if isSyncedTable() && isMember(hid) && (request.query.limit != 1 || liveAllowed(hid));
         allow create, update: if isSyncedTable() && canEdit(hid) && validRow();
         // Deletes are soft (deleted_at) so every device hears about them.
         allow delete: if false;

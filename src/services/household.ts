@@ -27,7 +27,7 @@ import { firestore } from './firebase';
 // enforce every permission here; these helpers only shape the writes.
 
 export interface Membership {
-    household: { id: string; name: string; ownerId: string };
+    household: { id: string; name: string; ownerId: string; ownerPro: boolean };
     role: Role;
 }
 
@@ -66,7 +66,7 @@ export async function myMemberships(uid: string): Promise<Membership[]> {
         if (!h.exists()) continue;
         result.push({
             role: m.get('role') as Role,
-            household: { id: h.id, name: (h.get('name') as string) ?? 'Household', ownerId: h.get('ownerId') as string },
+            household: { id: h.id, name: (h.get('name') as string) ?? 'Household', ownerId: h.get('ownerId') as string, ownerPro: h.get('ownerPro') === true },
         });
     }
     return result.sort((a, b) => Number(b.role === 'owner') - Number(a.role === 'owner'));

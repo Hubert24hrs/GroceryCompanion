@@ -8,11 +8,12 @@ import { CATEGORIES, compareCategories } from '../domain/categories';
 import { Category, ListItem } from '../domain/types';
 import { canEdit } from '../domain/validation';
 import { useRecord, useTable } from '../state/hooks';
-import { formatMoney } from '../state/prefs';
-import { useIsPro, useSession } from '../state/session';
+import { formatMoney, usePrefs } from '../state/prefs';
+import { useIsPro, useLiveSync, useSession } from '../state/session';
+import { useLiveList } from '../state/sync';
 import { toast, toastError } from '../state/toast';
 import { Button, Card, EmptyState, IconButton, ProgressBar, tap, Text } from '../ui/primitives';
-import { layout } from '../ui/Screen';
+import { layout, useSyncRefreshControl } from '../ui/Screen';
 import { ActionItem, ActionSheet, ConfirmSheet, Sheet } from '../ui/Sheet';
 import { radius, spacing, useTheme } from '../ui/theme';
 import { EditItemSheet } from './list/EditItemSheet';
@@ -38,6 +39,12 @@ export function ListDetailScreen({ route, navigation }: RootScreenProps<'ListDet
     const allItems = useTable('items');
     const editable = canEdit(useSession(s => s.role));
     const isPro = useIsPro();
+    const liveSync = useLiveSync();
+    const refreshControl = useSyncRefreshControl();
+    const sharedList = useSession(s => s.linked && s.members.length > 1);
+    const liveHintDismissed = usePrefs(s => s.prefs.liveHintDismissed);
+    const updatePrefs = usePrefs(s => s.update);
+    useLiveList(listId, liveSync);
 
     const [editing, setEditing] = useState<ListItem | null>(null);
     const [menuOpen, setMenuOpen] = useState(false);
@@ -149,6 +156,14 @@ export function ListDetailScreen({ route, navigation }: RootScreenProps<'ListDet
                     </Text>
                 </Card>
             )}
+            {sharedList && !liveSync && !liveHintDismissed ? (
+                <Card style={styles.liveHint} onPress={() => navigation.navigate('Pro')} accessibilityLabel="Get live updates with Pro">
+                    <Text variant="caption" muted style={{ flex: 1 }}>
+                        Pull down to see your household’s changes, or get them live with Pro.
+                    </Text>
+                    <IconButton icon="close" size={16} label="Dismiss" onPress={() => void updatePrefs({ liveHintDismissed: true }).catch(toastError)} />
+                </Card>
+            ) : null}
             <View style={styles.stats}>
                 <Text variant="caption" muted>
                     {remaining} to get{checked.length ? ` · ${checked.length} in cart` : ''}
@@ -180,6 +195,7 @@ export function ListDetailScreen({ route, navigation }: RootScreenProps<'ListDet
                 keyExtractor={i => i.id}
                 stickySectionHeadersEnabled={false}
                 keyboardShouldPersistTaps="handled"
+                refreshControl={refreshControl}
                 contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + (checked.length ? 110 : 40) }]}
                 ListHeaderComponent={header}
                 ListEmptyComponent={
@@ -279,6 +295,7 @@ const styles = StyleSheet.create({
     root: { flex: 1 },
     content: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, ...layout.page },
     header: { gap: spacing.md, marginBottom: spacing.lg },
+    liveHint: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs },
     stats: { flexDirection: 'row', justifyContent: 'space-between' },
     band: {
         flexDirection: 'row',

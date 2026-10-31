@@ -1,5 +1,12 @@
-// Free vs Pro. The UI gates on these; the server independently enforces the
-// household member limit in firestore.rules (keep FREE_LIMITS.householdMembers in sync).
+// Every monetization decision lives here: the entitlement, free limits, which
+// features need Pro, and where delivery is offered. The UI gates on these; the
+// server independently enforces what it can, and keeps its own copy because it
+// deploys separately:
+//   firestore.rules          FREE_LIMITS.householdMembers, OWNER_PRO_UNLOCKS_HOUSEHOLD
+//   functions/src/delivery.ts DELIVERY_COUNTRIES, FEATURE_ACCESS.delivery (a test compares them)
+
+/** RevenueCat entitlement that means "Pro". */
+export const ENTITLEMENT_ID = process.env.EXPO_PUBLIC_REVENUECAT_ENTITLEMENT_ID || 'pro';
 
 export const FREE_LIMITS = {
     activeLists: 2,
@@ -27,7 +34,34 @@ export type ProFeature =
     | 'barcodeScanner'
     | 'voiceAdd'
     | 'fullAnalytics'
-    | 'priceInsights';
+    | 'priceInsights'
+    | 'liveSync'
+    | 'recipeToList'
+    | 'delivery';
+
+/** A household owner on Pro unlocks live sync for everyone in the household. */
+export const OWNER_PRO_UNLOCKS_HOUSEHOLD = true;
+
+/** Set a feature to 'free' to open it to everyone. Anything not listed needs Pro. */
+export const FEATURE_ACCESS: Partial<Record<ProFeature, 'free' | 'pro'>> = {
+    liveSync: 'pro',
+    recipeToList: 'pro',
+    pantryAlerts: 'pro',
+    delivery: 'pro',
+};
+
+export const EXPIRY_ALERT_DEFAULT_DAYS = 2;
+export const EXPIRY_ALERT_DAY_OPTIONS = [1, 2, 3, 5, 7];
+
+/**
+ * Sending a list to a delivery partner. 'off' hides it everywhere (Instacart
+ * must approve the API key first), 'mock' fakes the partner for development,
+ * 'live' calls the createDeliveryLink function.
+ */
+export type DeliveryMode = 'off' | 'mock' | 'live';
+const mode = process.env.EXPO_PUBLIC_DELIVERY_MODE;
+export const DELIVERY_MODE: DeliveryMode = mode === 'mock' || mode === 'live' ? mode : 'off';
+export const DELIVERY_COUNTRIES = ['US', 'CA'];
 
 /** What the free plan includes (shown on the Pro screen for comparison). */
 export const FREE_FEATURES: string[] = [
@@ -39,6 +73,8 @@ export const FREE_FEATURES: string[] = [
 ];
 
 export const PRO_FEATURES: { feature: ProFeature; title: string; detail: string; icon: string }[] = [
+    { feature: 'liveSync', title: 'Live family sync', detail: 'See the open list change as your household shops', icon: 'sync' },
+    { feature: 'recipeToList', title: 'Recipe to list', detail: 'Add ingredients, skipping what you already have', icon: 'cart' },
     { feature: 'unlimitedLists', title: 'Unlimited lists', detail: `Free includes ${FREE_LIMITS.activeLists} lists`, icon: 'list' },
     { feature: 'listTemplates', title: 'Reusable list templates', detail: 'Weekly staples in one tap', icon: 'copy' },
     { feature: 'mealPlanner', title: 'Meal planner', detail: 'Plan the week and get one shopping list', icon: 'calendar' },
@@ -52,8 +88,13 @@ export const PRO_FEATURES: { feature: ProFeature; title: string; detail: string;
     { feature: 'voiceAdd', title: 'Voice add', detail: 'Say your list instead of typing it', icon: 'mic' },
 ];
 
-export function hasFeature(isPro: boolean, _feature: ProFeature): boolean {
-    return isPro;
+export function hasFeature(isPro: boolean, feature: ProFeature): boolean {
+    return isPro || FEATURE_ACCESS[feature] === 'free';
+}
+
+/** Live sync is also unlocked by the household owner's Pro (ownerPro, set by the webhook). */
+export function canLiveSync(isPro: boolean, ownerPro: boolean): boolean {
+    return hasFeature(isPro, 'liveSync') || (OWNER_PRO_UNLOCKS_HOUSEHOLD && ownerPro);
 }
 
 export function canCreateList(isPro: boolean, activeListCount: number): boolean {
